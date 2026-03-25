@@ -1,0 +1,8 @@
+scikit-learn
+pandas
+numpy
+seaborn
+matplotlib
+cloudpickle
+networkx
+fn_graph
