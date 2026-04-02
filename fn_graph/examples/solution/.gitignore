@@ -1,0 +1,16 @@
+# secrets
+.env
+
+# generated artifacts and logs
+artifacts/
+logs/
+
+# generated images
+*.png
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pkl
+*.tmp

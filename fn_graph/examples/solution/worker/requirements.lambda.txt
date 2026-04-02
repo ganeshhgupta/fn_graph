@@ -1,0 +1,7 @@
+cloudpickle
+scikit-learn<1.6
+pandas
+numpy<2
+seaborn
+matplotlib
+networkx

@@ -1,0 +1,31 @@
+pipeline:
+  run_id: finance_run_001
+  on_failure: finish_running
+
+artifact_store:
+  type: fs
+  base_dir: ./artifacts
+
+nodes:
+  # --- local ---
+  closing_prices:
+    executor: memory
+  normalised_returns:
+    executor: memory
+  positions:
+    executor: memory
+  total_position:
+    executor: memory
+  positions_plot:
+    executor: memory
+  cumulative_return:
+    executor: memory
+  daily_return:
+    executor: memory
+  sharpe_ratio:
+    executor: memory
+  annual_sharpe_ratio:
+    executor: memory
+
+  "*":
+    executor: memory
