@@ -1,0 +1,172 @@
+[run_pipeline] logging to: C:\Users\GuptaGanesh\Desktop\Ads\fn_graph\fn_graph\examples\solution\logs\machine_learning\iris_run_001\2026-04-01_21-55-58.log
+[config] creating artifact store: fs
+[run_pipeline] artifact store: LocalFSArtifactStore
+[run_pipeline] executors configured:
+  model_type: memory
+  do_preprocess: memory
+  iris: memory
+  data: docker
+  preprocess_data: docker
+  investigate_data: memory
+  split_data: lambda
+  training_features: lambda
+  training_target: memory
+  test_features: lambda
+  test_target: memory
+  model: docker
+  predictions: lambda
+  classification_metrics: lambda
+  confusion_matrix: memory
+
+[PipelineComposer] starting pipeline run
+[PipelineComposer] execution order: ['model_type', 'do_preprocess', 'iris', 'data', 'preprocess_data', 'investigate_data', 'split_data', 'training_features', 'training_target', 'test_features', 'test_target', 'model', 'predictions', 'classification_metrics', 'confusion_matrix']
+[PipelineComposer] parameters: ['model_type', 'do_preprocess']
+
+[PipelineComposer] seeding parameters into artifact store
+[LocalFSArtifactStore] writing model_type to artifacts\iris_run_001\model_type.pkl
+[LocalFSArtifactStore] model_type written, size: 18 bytes
+[PipelineComposer] seeded: model_type = ols
+[LocalFSArtifactStore] writing do_preprocess to artifacts\iris_run_001\do_preprocess.pkl
+[LocalFSArtifactStore] do_preprocess written, size: 4 bytes
+[PipelineComposer] seeded: do_preprocess = True
+
+[PipelineComposer] beginning node execution
+
+[PipelineComposer] --- node: model_type (1/15) ---
+[PipelineComposer] skipping parameter node: model_type
+
+[PipelineComposer] --- node: do_preprocess (2/15) ---
+[PipelineComposer] skipping parameter node: do_preprocess
+
+[PipelineComposer] --- node: iris (3/15) ---
+[LocalFSArtifactStore] exists(iris): True
+[PipelineComposer] output exists, skipping: iris
+
+[PipelineComposer] --- node: data (4/15) ---
+[LocalFSArtifactStore] exists(data): True
+[PipelineComposer] output exists, skipping: data
+
+[PipelineComposer] --- node: preprocess_data (5/15) ---
+[LocalFSArtifactStore] exists(preprocess_data): True
+[PipelineComposer] output exists, skipping: preprocess_data
+
+[PipelineComposer] --- node: investigate_data (6/15) ---
+[LocalFSArtifactStore] exists(investigate_data): True
+[PipelineComposer] output exists, skipping: investigate_data
+
+[PipelineComposer] --- node: split_data (7/15) ---
+[LocalFSArtifactStore] exists(split_data): True
+[PipelineComposer] output exists, skipping: split_data
+
+[PipelineComposer] --- node: training_features (8/15) ---
+[LocalFSArtifactStore] exists(training_features): True
+[PipelineComposer] output exists, skipping: training_features
+
+[PipelineComposer] --- node: training_target (9/15) ---
+[LocalFSArtifactStore] exists(training_target): True
+[PipelineComposer] output exists, skipping: training_target
+
+[PipelineComposer] --- node: test_features (10/15) ---
+[LocalFSArtifactStore] exists(test_features): True
+[PipelineComposer] output exists, skipping: test_features
+
+[PipelineComposer] --- node: test_target (11/15) ---
+[LocalFSArtifactStore] exists(test_target): True
+[PipelineComposer] output exists, skipping: test_target
+
+[PipelineComposer] --- node: model (12/15) ---
+[LocalFSArtifactStore] exists(model): True
+[PipelineComposer] output exists, skipping: model
+
+[PipelineComposer] --- node: predictions (13/15) ---
+[LocalFSArtifactStore] exists(predictions): True
+[PipelineComposer] output exists, skipping: predictions
+
+[PipelineComposer] --- node: classification_metrics (14/15) ---
+[LocalFSArtifactStore] exists(classification_metrics): True
+[PipelineComposer] output exists, skipping: classification_metrics
+
+[PipelineComposer] --- node: confusion_matrix (15/15) ---
+[LocalFSArtifactStore] exists(confusion_matrix): True
+[PipelineComposer] output exists, skipping: confusion_matrix
+
+[PipelineComposer] pipeline complete, collecting results
+[LocalFSArtifactStore] exists(model_type): True
+[LocalFSArtifactStore] loading model_type from artifacts\iris_run_001\model_type.pkl
+[LocalFSArtifactStore] model_type loaded, type: str
+[LocalFSArtifactStore] exists(do_preprocess): True
+[LocalFSArtifactStore] loading do_preprocess from artifacts\iris_run_001\do_preprocess.pkl
+[LocalFSArtifactStore] do_preprocess loaded, type: bool
+[LocalFSArtifactStore] exists(iris): True
+[LocalFSArtifactStore] loading iris from artifacts\iris_run_001\iris.pkl
+[LocalFSArtifactStore] iris loaded, type: Bunch
+[LocalFSArtifactStore] exists(data): True
+[LocalFSArtifactStore] loading data from artifacts\iris_run_001\data.pkl
+[LocalFSArtifactStore] data loaded, type: DataFrame
+[LocalFSArtifactStore] exists(preprocess_data): True
+[LocalFSArtifactStore] loading preprocess_data from artifacts\iris_run_001\preprocess_data.pkl
+[LocalFSArtifactStore] preprocess_data loaded, type: DataFrame
+[LocalFSArtifactStore] exists(investigate_data): True
+[LocalFSArtifactStore] loading investigate_data from artifacts\iris_run_001\investigate_data.pkl
+[LocalFSArtifactStore] investigate_data loaded, type: PairGrid
+[LocalFSArtifactStore] exists(split_data): True
+[LocalFSArtifactStore] loading split_data from artifacts\iris_run_001\split_data.pkl
+[LocalFSArtifactStore] split_data loaded, type: dict
+[LocalFSArtifactStore] exists(training_features): True
+[LocalFSArtifactStore] loading training_features from artifacts\iris_run_001\training_features.pkl
+[LocalFSArtifactStore] training_features loaded, type: DataFrame
+[LocalFSArtifactStore] exists(training_target): True
+[LocalFSArtifactStore] loading training_target from artifacts\iris_run_001\training_target.pkl
+[LocalFSArtifactStore] training_target loaded, type: Series
+[LocalFSArtifactStore] exists(test_features): True
+[LocalFSArtifactStore] loading test_features from artifacts\iris_run_001\test_features.pkl
+[LocalFSArtifactStore] test_features loaded, type: DataFrame
+[LocalFSArtifactStore] exists(test_target): True
+[LocalFSArtifactStore] loading test_target from artifacts\iris_run_001\test_target.pkl
+[LocalFSArtifactStore] test_target loaded, type: Series
+[LocalFSArtifactStore] exists(model): True
+[LocalFSArtifactStore] loading model from artifacts\iris_run_001\model.pkl
+[LocalFSArtifactStore] model loaded, type: LogisticRegression
+[LocalFSArtifactStore] exists(predictions): True
+[LocalFSArtifactStore] loading predictions from artifacts\iris_run_001\predictions.pkl
+[LocalFSArtifactStore] predictions loaded, type: ndarray
+[LocalFSArtifactStore] exists(classification_metrics): True
+[LocalFSArtifactStore] loading classification_metrics from artifacts\iris_run_001\classification_metrics.pkl
+[LocalFSArtifactStore] classification_metrics loaded, type: str
+[LocalFSArtifactStore] exists(confusion_matrix): True
+[LocalFSArtifactStore] loading confusion_matrix from artifacts\iris_run_001\confusion_matrix.pkl
+[LocalFSArtifactStore] confusion_matrix loaded, type: Figure
+[PipelineComposer] results collected: ['model_type', 'do_preprocess', 'iris', 'data', 'preprocess_data', 'investigate_data', 'split_data', 'training_features', 'training_target', 'test_features', 'test_target', 'model', 'predictions', 'classification_metrics', 'confusion_matrix']
+
+============================================================
+=== Pipeline Results ===
+
+[model_type]
+ols
+[do_preprocess] True
+[iris] Bunch
+[data] DataFrame
+[preprocess_data] DataFrame
+[investigate_data] PairGrid
+[split_data] dict
+[training_features] DataFrame
+[training_target] Series
+[test_features] DataFrame
+[test_target] Series
+[model] LogisticRegression
+[predictions] ndarray
+
+[classification_metrics]
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00        10
+           1       0.83      1.00      0.91        15
+           2       1.00      0.77      0.87        13
+
+    accuracy                           0.92        38
+   macro avg       0.94      0.92      0.93        38
+weighted avg       0.93      0.92      0.92        38
+
+[confusion_matrix] figure saved to config\confusion_matrix.png
+
+[run_pipeline] log saved to: C:\Users\GuptaGanesh\Desktop\Ads\fn_graph\fn_graph\examples\solution\logs\machine_learning\iris_run_001\2026-04-01_21-55-58.log
