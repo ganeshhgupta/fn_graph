@@ -1,0 +1,147 @@
+[run_pipeline] logging to: C:\Users\GuptaGanesh\Desktop\Ads\fn_graph\fn_graph\examples\solution\logs\finance\finance_run_001\2026-04-01_21-56-11.log
+[config] creating artifact store: fs
+[run_pipeline] artifact store: LocalFSArtifactStore
+[run_pipeline] executors configured:
+  closing_prices: memory
+  normalised_returns: memory
+  positions: memory
+  total_position: memory
+  positions_plot: memory
+  cumulative_return: memory
+  daily_return: memory
+  sharpe_ratio: memory
+  annual_sharpe_ratio: memory
+  share_allocations: memory
+  initial_total_position: memory
+  start_date: memory
+  end_date: memory
+
+[PipelineComposer] starting pipeline run
+[PipelineComposer] execution order: ['share_allocations', 'initial_total_position', 'start_date', 'end_date', 'closing_prices', 'normalised_returns', 'positions', 'total_position', 'positions_plot', 'cumulative_return', 'daily_return', 'sharpe_ratio', 'annual_sharpe_ratio']
+[PipelineComposer] parameters: ['share_allocations', 'initial_total_position', 'start_date', 'end_date']
+
+[PipelineComposer] seeding parameters into artifact store
+[LocalFSArtifactStore] writing share_allocations to artifacts\finance_run_001\share_allocations.pkl
+[LocalFSArtifactStore] share_allocations written, size: 79 bytes
+[PipelineComposer] seeded: share_allocations = {'AAPL': 0.25, 'MSFT': 0.25, 'ORCL': 0.3, 'IBM': 0.2}
+[LocalFSArtifactStore] writing initial_total_position to artifacts\finance_run_001\initial_total_position.pkl
+[LocalFSArtifactStore] initial_total_position written, size: 17 bytes
+[PipelineComposer] seeded: initial_total_position = 100000000
+[LocalFSArtifactStore] writing start_date to artifacts\finance_run_001\start_date.pkl
+[LocalFSArtifactStore] start_date written, size: 25 bytes
+[PipelineComposer] seeded: start_date = 2017-01-01
+[LocalFSArtifactStore] writing end_date to artifacts\finance_run_001\end_date.pkl
+[LocalFSArtifactStore] end_date written, size: 43 bytes
+[PipelineComposer] seeded: end_date = 2026-04-01
+
+[PipelineComposer] beginning node execution
+
+[PipelineComposer] --- node: share_allocations (1/13) ---
+[PipelineComposer] skipping parameter node: share_allocations
+
+[PipelineComposer] --- node: initial_total_position (2/13) ---
+[PipelineComposer] skipping parameter node: initial_total_position
+
+[PipelineComposer] --- node: start_date (3/13) ---
+[PipelineComposer] skipping parameter node: start_date
+
+[PipelineComposer] --- node: end_date (4/13) ---
+[PipelineComposer] skipping parameter node: end_date
+
+[PipelineComposer] --- node: closing_prices (5/13) ---
+[LocalFSArtifactStore] exists(closing_prices): True
+[PipelineComposer] output exists, skipping: closing_prices
+
+[PipelineComposer] --- node: normalised_returns (6/13) ---
+[LocalFSArtifactStore] exists(normalised_returns): True
+[PipelineComposer] output exists, skipping: normalised_returns
+
+[PipelineComposer] --- node: positions (7/13) ---
+[LocalFSArtifactStore] exists(positions): True
+[PipelineComposer] output exists, skipping: positions
+
+[PipelineComposer] --- node: total_position (8/13) ---
+[LocalFSArtifactStore] exists(total_position): True
+[PipelineComposer] output exists, skipping: total_position
+
+[PipelineComposer] --- node: positions_plot (9/13) ---
+[LocalFSArtifactStore] exists(positions_plot): True
+[PipelineComposer] output exists, skipping: positions_plot
+
+[PipelineComposer] --- node: cumulative_return (10/13) ---
+[LocalFSArtifactStore] exists(cumulative_return): True
+[PipelineComposer] output exists, skipping: cumulative_return
+
+[PipelineComposer] --- node: daily_return (11/13) ---
+[LocalFSArtifactStore] exists(daily_return): True
+[PipelineComposer] output exists, skipping: daily_return
+
+[PipelineComposer] --- node: sharpe_ratio (12/13) ---
+[LocalFSArtifactStore] exists(sharpe_ratio): True
+[PipelineComposer] output exists, skipping: sharpe_ratio
+
+[PipelineComposer] --- node: annual_sharpe_ratio (13/13) ---
+[LocalFSArtifactStore] exists(annual_sharpe_ratio): True
+[PipelineComposer] output exists, skipping: annual_sharpe_ratio
+
+[PipelineComposer] pipeline complete, collecting results
+[LocalFSArtifactStore] exists(closing_prices): True
+[LocalFSArtifactStore] loading closing_prices from artifacts\finance_run_001\closing_prices.pkl
+[LocalFSArtifactStore] closing_prices loaded, type: DataFrame
+[LocalFSArtifactStore] exists(normalised_returns): True
+[LocalFSArtifactStore] loading normalised_returns from artifacts\finance_run_001\normalised_returns.pkl
+[LocalFSArtifactStore] normalised_returns loaded, type: DataFrame
+[LocalFSArtifactStore] exists(positions): True
+[LocalFSArtifactStore] loading positions from artifacts\finance_run_001\positions.pkl
+[LocalFSArtifactStore] positions loaded, type: DataFrame
+[LocalFSArtifactStore] exists(total_position): True
+[LocalFSArtifactStore] loading total_position from artifacts\finance_run_001\total_position.pkl
+[LocalFSArtifactStore] total_position loaded, type: Series
+[LocalFSArtifactStore] exists(positions_plot): True
+[LocalFSArtifactStore] loading positions_plot from artifacts\finance_run_001\positions_plot.pkl
+[LocalFSArtifactStore] positions_plot loaded, type: Axes
+[LocalFSArtifactStore] exists(cumulative_return): True
+[LocalFSArtifactStore] loading cumulative_return from artifacts\finance_run_001\cumulative_return.pkl
+[LocalFSArtifactStore] cumulative_return loaded, type: float64
+[LocalFSArtifactStore] exists(daily_return): True
+[LocalFSArtifactStore] loading daily_return from artifacts\finance_run_001\daily_return.pkl
+[LocalFSArtifactStore] daily_return loaded, type: Series
+[LocalFSArtifactStore] exists(sharpe_ratio): True
+[LocalFSArtifactStore] loading sharpe_ratio from artifacts\finance_run_001\sharpe_ratio.pkl
+[LocalFSArtifactStore] sharpe_ratio loaded, type: float64
+[LocalFSArtifactStore] exists(annual_sharpe_ratio): True
+[LocalFSArtifactStore] loading annual_sharpe_ratio from artifacts\finance_run_001\annual_sharpe_ratio.pkl
+[LocalFSArtifactStore] annual_sharpe_ratio loaded, type: float64
+[LocalFSArtifactStore] exists(share_allocations): True
+[LocalFSArtifactStore] loading share_allocations from artifacts\finance_run_001\share_allocations.pkl
+[LocalFSArtifactStore] share_allocations loaded, type: dict
+[LocalFSArtifactStore] exists(initial_total_position): True
+[LocalFSArtifactStore] loading initial_total_position from artifacts\finance_run_001\initial_total_position.pkl
+[LocalFSArtifactStore] initial_total_position loaded, type: int
+[LocalFSArtifactStore] exists(start_date): True
+[LocalFSArtifactStore] loading start_date from artifacts\finance_run_001\start_date.pkl
+[LocalFSArtifactStore] start_date loaded, type: str
+[LocalFSArtifactStore] exists(end_date): True
+[LocalFSArtifactStore] loading end_date from artifacts\finance_run_001\end_date.pkl
+[LocalFSArtifactStore] end_date loaded, type: date
+[PipelineComposer] results collected: ['closing_prices', 'normalised_returns', 'positions', 'total_position', 'positions_plot', 'cumulative_return', 'daily_return', 'sharpe_ratio', 'annual_sharpe_ratio', 'share_allocations', 'initial_total_position', 'start_date', 'end_date']
+
+============================================================
+=== Pipeline Results ===
+[closing_prices] DataFrame
+[normalised_returns] DataFrame
+[positions] DataFrame
+[total_position] Series
+[positions_plot] figure saved to config\positions_plot.png
+[cumulative_return] 477.87455138867614
+[daily_return] Series
+[sharpe_ratio] 0.05733019529488896
+[annual_sharpe_ratio] 0.910088636190249
+[share_allocations] dict
+[initial_total_position] 100000000
+
+[start_date]
+2017-01-01
+[end_date] date
+
+[run_pipeline] log saved to: C:\Users\GuptaGanesh\Desktop\Ads\fn_graph\fn_graph\examples\solution\logs\finance\finance_run_001\2026-04-01_21-56-11.log
