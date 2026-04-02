@@ -1,9 +1,12 @@
 # secrets
 .env
 
-# generated artifacts and logs
+# generated artifacts
 artifacts/
-logs/
+
+# logs — tracked in git so runs can be compared
+# logs/
+
 
 # generated images
 *.png
