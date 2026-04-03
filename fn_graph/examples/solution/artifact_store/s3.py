@@ -49,7 +49,4 @@ class S3ArtifactStore(BaseArtifactStore):
 
     def metadata(self, key: str) -> dict:
         response = self._client.head_object(Bucket=self.bucket, Key=self._key(key))
-        return {
-            "size": response["ContentLength"],
-            "last_modified": response["LastModified"],
-        }
+        return {"size": response["ContentLength"], "last_modified": response["LastModified"]}

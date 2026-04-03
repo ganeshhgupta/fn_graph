@@ -8,9 +8,6 @@ from pydantic import BaseModel
 
 app = FastAPI()
 
-# Pre-populate execution namespace with packages available in this container.
-# Functions from machine_learning.py (and similar pipelines) use module-level
-# imports; pre-loading them here means exec'd source works without modification.
 _BASE_NAMESPACE: dict = {}
 for _mod_name, _alias in [
     ("sklearn", "sklearn"),
@@ -35,7 +32,6 @@ for _mod_name, _alias in [
     except ImportError:
         pass
 
-# Inject common bare-name imports that machine_learning.py uses at module level
 try:
     from sklearn.model_selection import train_test_split as _tts
     _BASE_NAMESPACE["train_test_split"] = _tts

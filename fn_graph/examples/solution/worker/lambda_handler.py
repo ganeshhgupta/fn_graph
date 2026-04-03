@@ -1,11 +1,15 @@
+"""
+Lambda handler — runs inside the Lambda container (ECR image).
+Receives the same payload as the Docker worker's /execute endpoint,
+executes the node function, and returns the result.
+"""
 import base64
-import importlib
+import json
 import traceback as tb_module
 
 import cloudpickle
 
-# Pre-populate execution namespace — mirrors server.py so the same
-# fn_source strings work in both Docker and Lambda.
+# Pre-populate namespace same as Docker worker so node functions work unchanged
 _BASE_NAMESPACE: dict = {}
 for _mod_name, _alias in [
     ("sklearn", "sklearn"),
@@ -23,9 +27,10 @@ for _mod_name, _alias in [
     ("networkx", "nx"),
 ]:
     try:
-        _mod = importlib.import_module(_mod_name)
+        import importlib as _il
+        _mod = _il.import_module(_mod_name)
         _BASE_NAMESPACE[_alias] = _mod
-        _BASE_NAMESPACE[_mod_name.split(".")[0]] = importlib.import_module(_mod_name.split(".")[0])
+        _BASE_NAMESPACE[_mod_name.split(".")[0]] = _il.import_module(_mod_name.split(".")[0])
     except ImportError:
         pass
 
@@ -37,13 +42,24 @@ except ImportError:
 
 
 def handler(event, context):
+    """
+    AWS Lambda entry point.
+
+    Expected event keys:
+        node_name   str   name of the node function to run
+        fn_source   str   source code of the function (inspect.getsource)
+        kwargs_b64  str   base64(cloudpickle(kwargs dict))
+
+    Returns:
+        { result_b64: str }  on success
+        { statusCode: 500, error: str, traceback: str }  on failure
+    """
     node_name = event.get("node_name", "<unknown>")
+    print(f"[lambda_handler] received node: {node_name}", flush=True)
+
     try:
         fn_source = event["fn_source"]
         kwargs_b64 = event["kwargs_b64"]
-
-        print(f"[lambda_handler] received request for node: {node_name}", flush=True)
-        print(f"[lambda_handler] fn_source length: {len(fn_source)} chars", flush=True)
 
         namespace = dict(_BASE_NAMESPACE)
         exec(fn_source, namespace)
@@ -51,9 +67,8 @@ def handler(event, context):
         print(f"[lambda_handler] function loaded: {node_name}", flush=True)
 
         kwargs = cloudpickle.loads(base64.b64decode(kwargs_b64))
-        print(f"[lambda_handler] inputs loaded: {list(kwargs.keys())}", flush=True)
+        print(f"[lambda_handler] inputs: {list(kwargs.keys())}", flush=True)
 
-        print(f"[lambda_handler] running {node_name}...", flush=True)
         result = fn(**kwargs)
         print(f"[lambda_handler] {node_name} complete, output type: {type(result).__name__}", flush=True)
 

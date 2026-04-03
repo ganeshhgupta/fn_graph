@@ -3,6 +3,7 @@ Entry point for the pluggable pipeline orchestration layer.
 
 Usage:
     python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config config/iris.yaml
+    python run_pipeline.py --pipeline fn_graph.examples.finance --config config/finance.yaml
 """
 
 import argparse
@@ -11,10 +12,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-# Make solution/ importable regardless of cwd
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Load .env if present (never required — falls back to environment variables)
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -26,7 +25,7 @@ from composer import PipelineComposer
 
 
 class _Tee:
-    """Duplicates writes to both the real stdout and a log file."""
+    """Duplicates writes to both stdout and a log file."""
     def __init__(self, real, log_file):
         self._real = real
         self._log = log_file
@@ -44,8 +43,7 @@ class _Tee:
 
 
 def _setup_log(pipeline: str, run_id: str) -> Path:
-    """Create logs/{pipeline_name}/{run_id}/ and open a timestamped log file."""
-    pipeline_name = pipeline.split(".")[-1]          # e.g. "machine_learning"
+    pipeline_name = pipeline.split(".")[-1]
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_dir = Path(__file__).parent / "logs" / pipeline_name / run_id
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -57,27 +55,17 @@ def main():
     print("[run_pipeline] starting", flush=True)
 
     parser = argparse.ArgumentParser(description="Run an fn_graph pipeline.")
-    parser.add_argument(
-        "--pipeline",
-        required=True,
-        help="Dotted module path to the pipeline, e.g. fn_graph.examples.machine_learning",
-    )
-    parser.add_argument(
-        "--config",
-        required=True,
-        help="Path to a config yaml, e.g. config/iris.yaml",
-    )
+    parser.add_argument("--pipeline", required=True, help="Dotted module path, e.g. fn_graph.examples.machine_learning")
+    parser.add_argument("--config", required=True, help="Path to config yaml, e.g. config/iris.yaml")
     args = parser.parse_args()
 
-    print(f"[run_pipeline] pipeline module: {args.pipeline}", flush=True)
-    print(f"[run_pipeline] config file: {args.config}", flush=True)
+    print(f"[run_pipeline] pipeline: {args.pipeline}", flush=True)
+    print(f"[run_pipeline] config:   {args.config}", flush=True)
 
     module = importlib.import_module(args.pipeline)
     f = module.f
 
-    # Compatibility shim: finance.py uses total_position[-1] / total_position[0]
-    # which breaks on DatetimeIndex Series in pandas >= 2.0. Override the function
-    # in the composer without touching the source file.
+    # Pandas >= 2.0 compatibility patch for finance pipeline
     if hasattr(module, "cumulative_return"):
         import inspect as _inspect
         try:
@@ -88,34 +76,34 @@ def main():
             def cumulative_return(total_position):
                 return 100 * (total_position.iloc[-1] / total_position.iloc[0] - 1)
             f = f.update(cumulative_return=cumulative_return)
-            print("[run_pipeline] applied pandas compatibility patch to: cumulative_return", flush=True)
-
-    print("[run_pipeline] composer loaded, building pipeline", flush=True)
+            print("[run_pipeline] applied pandas compatibility patch: cumulative_return", flush=True)
 
     config = load_config(args.config)
     run_id = config["pipeline"]["run_id"]
+    on_failure = config["pipeline"].get("on_failure", "stop")
 
-    # ── logging setup ──────────────────────────────────────────────────────────
+    # Logging setup
     log_path = _setup_log(args.pipeline, run_id)
     log_file = open(log_path, "w", encoding="utf-8")
     sys.stdout = _Tee(sys.__stdout__, log_file)
     print(f"[run_pipeline] logging to: {log_path}", flush=True)
-    # ──────────────────────────────────────────────────────────────────────────
 
     artifact_store = get_artifact_store(config)
     print(f"[run_pipeline] artifact store: {type(artifact_store).__name__}", flush=True)
 
-    # Build per-node config map for all nodes in the DAG
+    # Build per-node execution config for every node in the DAG
     all_nodes = list(f.dag().nodes())
-    execution_config = {}
-    for node_name in all_nodes:
-        execution_config[node_name] = get_node_config(config, node_name)
+    execution_config = {node: get_node_config(config, node) for node in all_nodes}
 
     print("[run_pipeline] executors configured:", flush=True)
     for node_name, node_cfg in execution_config.items():
         print(f"  {node_name}: {node_cfg.get('executor', 'memory')}", flush=True)
 
-    pipeline = PipelineComposer(execution_config=execution_config, artifact_store=artifact_store)
+    pipeline = PipelineComposer(
+        execution_config=execution_config,
+        artifact_store=artifact_store,
+        on_failure=on_failure,
+    )
     results = pipeline.run(f)
 
     print("\n" + "=" * 60, flush=True)
@@ -130,7 +118,7 @@ def main():
             out_path = Path(args.config).parent / f"{name}.png"
             value.savefig(out_path)
             print(f"[{name}] figure saved to {out_path}", flush=True)
-        elif hasattr(value, 'get_figure'):
+        elif hasattr(value, "get_figure"):
             out_path = Path(args.config).parent / f"{name}.png"
             value.get_figure().savefig(out_path)
             print(f"[{name}] figure saved to {out_path}", flush=True)
