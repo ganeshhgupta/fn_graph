@@ -27,10 +27,7 @@ class LambdaExecutor(BaseExecutor):
         size_mb = len(payload_bytes) / (1024 * 1024)
 
         if len(payload_bytes) > _LAMBDA_PAYLOAD_LIMIT:
-            print(
-                f"[LambdaExecutor] ERROR: payload {size_mb:.2f}MB exceeds Lambda 6MB limit",
-                flush=True,
-            )
+            print(f"[LambdaExecutor] ERROR: payload {size_mb:.2f}MB exceeds Lambda 6MB limit", flush=True)
             raise ValueError(
                 f"Payload for node '{node_name}' is {size_mb:.2f}MB, which exceeds the 6MB Lambda "
                 "limit. Switch to an S3 artifact store and pass S3 paths instead."
@@ -53,9 +50,7 @@ class LambdaExecutor(BaseExecutor):
         if status_code == 500 or "error" in result_payload:
             print(f"[LambdaExecutor] ERROR in node '{node_name}': {result_payload.get('error')}", flush=True)
             print(f"[LambdaExecutor] traceback:\n{result_payload.get('traceback', '')}", flush=True)
-            raise RuntimeError(
-                f"Lambda error in node '{node_name}': {result_payload.get('error')}"
-            )
+            raise RuntimeError(f"Lambda error in node '{node_name}': {result_payload.get('error')}")
 
         result = cloudpickle.loads(base64.b64decode(result_payload["result_b64"]))
         print(f"[LambdaExecutor] node {node_name} complete, output type: {type(result).__name__}", flush=True)

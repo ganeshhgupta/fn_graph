@@ -22,10 +22,12 @@ def _free_port() -> int:
 
 
 class DockerExecutor(BaseExecutor):
-    def __init__(self, image: str):
+    def __init__(self, image: str, retry: dict = None):
         self.image = image
+        # retry config: { max_attempts, delay_seconds, backoff: linear|exponential }
+        self.retry = retry or {"max_attempts": 1, "delay_seconds": 0, "backoff": "linear"}
 
-    def execute(self, node_name: str, fn: Callable, kwargs: dict) -> Any:
+    def _run_once(self, node_name: str, fn: Callable, kwargs: dict) -> Any:
         print(f"[DockerExecutor] starting container for node: {node_name}", flush=True)
         print(f"[DockerExecutor] image: {self.image}", flush=True)
 
@@ -36,14 +38,11 @@ class DockerExecutor(BaseExecutor):
         try:
             result = subprocess.run(
                 ["docker", "run", "-d", "-p", f"{port}:8000", self.image],
-                capture_output=True,
-                text=True,
-                check=True,
+                capture_output=True, text=True, check=True,
             )
             container_id = result.stdout.strip()
             print(f"[DockerExecutor] container id: {container_id}", flush=True)
 
-            # Poll /health until ready
             deadline = time.time() + _HEALTH_TIMEOUT
             while True:
                 try:
@@ -53,9 +52,7 @@ class DockerExecutor(BaseExecutor):
                 except requests.exceptions.ConnectionError:
                     pass
                 if time.time() > deadline:
-                    raise TimeoutError(
-                        f"Worker container did not become healthy within {_HEALTH_TIMEOUT}s"
-                    )
+                    raise TimeoutError(f"Worker container did not become healthy within {_HEALTH_TIMEOUT}s")
                 time.sleep(_HEALTH_INTERVAL)
 
             print(f"[DockerExecutor] container healthy, sending work", flush=True)
@@ -64,7 +61,6 @@ class DockerExecutor(BaseExecutor):
             kwargs_b64 = base64.b64encode(cloudpickle.dumps(kwargs, protocol=4)).decode()
 
             print(f"[DockerExecutor] posting to /execute, inputs: {list(kwargs.keys())}", flush=True)
-
             resp = requests.post(
                 f"http://localhost:{port}/execute",
                 json={"node_name": node_name, "fn_source": fn_source, "kwargs_b64": kwargs_b64},
@@ -76,9 +72,7 @@ class DockerExecutor(BaseExecutor):
                 payload = resp.json()
                 print(f"[DockerExecutor] ERROR in node '{node_name}': {payload.get('error')}", flush=True)
                 print(f"[DockerExecutor] traceback:\n{payload.get('traceback', '')}", flush=True)
-                raise RuntimeError(
-                    f"Worker error in node '{node_name}': {payload.get('error')}"
-                )
+                raise RuntimeError(f"Worker error in node '{node_name}': {payload.get('error')}")
 
             resp.raise_for_status()
             payload = resp.json()
@@ -90,3 +84,19 @@ class DockerExecutor(BaseExecutor):
                 subprocess.run(["docker", "stop", container_id], capture_output=True)
                 subprocess.run(["docker", "rm", container_id], capture_output=True)
                 print(f"[DockerExecutor] container stopped and removed", flush=True)
+
+    def execute(self, node_name: str, fn: Callable, kwargs: dict) -> Any:
+        max_attempts = self.retry.get("max_attempts", 1)
+        delay = self.retry.get("delay_seconds", 0)
+        backoff = self.retry.get("backoff", "linear")
+
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return self._run_once(node_name, fn, kwargs)
+            except Exception as e:
+                if attempt == max_attempts:
+                    print(f"[DockerExecutor] all {max_attempts} attempts failed for node '{node_name}'", flush=True)
+                    raise
+                wait = delay * (2 ** (attempt - 1)) if backoff == "exponential" else delay
+                print(f"[DockerExecutor] attempt {attempt} failed: {e}. retrying in {wait}s...", flush=True)
+                time.sleep(wait)

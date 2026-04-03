@@ -1,13 +1,13 @@
 pipeline:
   run_id: iris_run_001
-  on_failure: finish_running
+  on_failure: finish_running   # keep going if a node fails
 
 artifact_store:
   type: fs
   base_dir: ./artifacts
 
 nodes:
-  # --- local ---
+  # --- in-process ---
   iris:
     executor: memory
   investigate_data:
@@ -32,7 +32,7 @@ nodes:
     retry:
       max_attempts: 3
       delay_seconds: 5
-      backoff: exponential
+      backoff: exponential     # linear | exponential
 
   # --- lambda ---
   split_data:
@@ -56,5 +56,6 @@ nodes:
     function_name: fn_graph_worker_lambda
     region: us-east-1
 
+  # --- default for any node not listed above ---
   "*":
     executor: memory

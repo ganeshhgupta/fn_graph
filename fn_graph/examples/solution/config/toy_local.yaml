@@ -1,6 +1,6 @@
 pipeline:
-  run_id: finance_run_001
-  on_failure: stop
+  run_id: toy_run_001
+  on_failure: finish_running
 
 artifact_store:
   type: fs
