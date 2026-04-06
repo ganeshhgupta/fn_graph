@@ -2,7 +2,7 @@
 Entry point for the pluggable pipeline orchestration layer.
 
 Usage:
-    python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config config/iris.yaml
+    python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config machine_learning_config.yaml
 """
 
 import argparse
@@ -64,14 +64,16 @@ def main():
     )
     parser.add_argument(
         "--config",
-        required=True,
-        help="Path to a config yaml, e.g. config/iris.yaml",
+        # Default to the machine_learning config so the most common case needs no extra flag
+        default="machine_learning_config.yaml",
+        help="Path to a config yaml, e.g. machine_learning_config.yaml",
     )
     args = parser.parse_args()
 
     print(f"[run_pipeline] pipeline module: {args.pipeline}", flush=True)
     print(f"[run_pipeline] config file: {args.config}", flush=True)
 
+    # Dynamically import the pipeline module and grab its Composer object named 'f'
     module = importlib.import_module(args.pipeline)
     f = module.f
 
@@ -105,7 +107,7 @@ def main():
     artifact_store = get_artifact_store(config)
     print(f"[run_pipeline] artifact store: {type(artifact_store).__name__}", flush=True)
 
-    # Build per-node config map for all nodes in the DAG
+    # Build per-node executor config for every node in the DAG
     all_nodes = list(f.dag().nodes())
     execution_config = {}
     for node_name in all_nodes:
@@ -115,8 +117,31 @@ def main():
     for node_name, node_cfg in execution_config.items():
         print(f"  {node_name}: {node_cfg.get('executor', 'memory')}", flush=True)
 
-    pipeline = PipelineComposer(execution_config=execution_config, artifact_store=artifact_store)
-    results = pipeline.run(f)
+    # Reconstruct the pipeline's Composer as a PipelineComposer by copying its
+    # internal state (_functions, _parameters, etc.) and injecting our extras.
+    # This keeps the pipeline definition file (machine_learning.py) unchanged —
+    # only the import would need swapping if the pipeline built a PipelineComposer directly.
+    pipeline = PipelineComposer(
+        _functions=f._functions,
+        _parameters=f._parameters,
+        _cache=f._cache,
+        _tests=f._tests,
+        _source_map=f._source_map,
+        execution_config=execution_config,
+        artifact_store=artifact_store,
+    )
+
+    # Leaf nodes (out-degree == 0, not parameters) are the pipeline's final outputs.
+    # Requesting these causes calculate() to walk their full ancestor subgraph.
+    dag = pipeline.dag()
+    param_names = set(pipeline.parameters().keys())
+    leaf_outputs = [
+        n for n in dag.nodes()
+        if dag.out_degree(n) == 0 and n not in param_names
+    ]
+    print(f"[run_pipeline] leaf outputs: {leaf_outputs}", flush=True)
+
+    results = pipeline.calculate(leaf_outputs)
 
     print("\n" + "=" * 60, flush=True)
     print("=== Pipeline Results ===", flush=True)
