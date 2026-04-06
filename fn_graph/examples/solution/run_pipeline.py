@@ -21,6 +21,12 @@ try:
 except ImportError:
     pass
 
+# Force non-interactive backend before any pipeline code touches matplotlib.
+# Without this, nodes that call plt.* from a ThreadPoolExecutor thread crash
+# because Tk (the default GUI backend) requires the main thread.
+import matplotlib
+matplotlib.use("Agg")
+
 from config import load_config, get_artifact_store, get_node_config
 from composer import PipelineComposer
 
