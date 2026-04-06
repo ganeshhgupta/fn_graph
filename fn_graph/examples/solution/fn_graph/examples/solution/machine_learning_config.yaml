@@ -1,0 +1,17 @@
+pipeline:
+  run_id: ml_run_001
+  on_failure: finish_running
+
+artifact_store:
+  type: fs
+  base_dir: ./artifacts
+
+nodes:
+  # model runs in a dedicated Docker container via HTTP — isolates heavy sklearn work
+  model:
+    executor: docker
+    image: fn_graph_worker_v2
+
+  # all other nodes run in-process for speed
+  "*":
+    executor: memory
