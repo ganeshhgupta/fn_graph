@@ -1,0 +1,12 @@
+pipeline:
+  run_id: ml_run_001
+  on_failure: finish_running
+
+artifact_store:
+  type: fs
+  base_dir: ./artifacts
+
+nodes:
+  # all nodes run in-process (no Docker)
+  "*":
+    executor: memory

@@ -8,6 +8,7 @@ artifact_store:
 
 nodes:
   # model runs in a dedicated Docker container via HTTP — isolates heavy sklearn work
+  # Switch to memory for local testing when Docker daemon is not running
   model:
     executor: docker
     image: fn_graph_worker_v2
