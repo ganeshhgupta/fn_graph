@@ -102,11 +102,11 @@ graph TD
     DOC -.->|"HTTP POST"| SRV
     SRV -.->|"exec + fn(**kwargs)"| FNS
 
-    BASE_E <|-- MEM
-    BASE_E <|-- DOC
-    BASE_E <|-- LAM
-    BASE_S <|-- FS
-    BASE_S <|-- S3
+    MEM -->|"extends"| BASE_E
+    DOC -->|"extends"| BASE_E
+    LAM -->|"extends"| BASE_E
+    FS -->|"extends"| BASE_S
+    S3 -->|"extends"| BASE_S
 ```
 
 ---
