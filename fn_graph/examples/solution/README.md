@@ -1,6 +1,6 @@
 # fn_graph Pipeline Orchestration
 
-A pluggable execution layer on top of [fn_graph](https://github.com/BusinessOptics/fn_graph) that lets you run any pipeline node locally, in Docker, or on AWS Lambda — just by changing a config file.
+A pluggable execution layer on top of [fn_graph](https://github.com/BusinessOptics/fn_graph) that lets you run any pipeline node locally, in Docker, or on AWS Lambda — just by changing a config file. Supports stage partitioning to reduce serialization overhead at stage boundaries.
 
 ---
 
@@ -9,9 +9,10 @@ A pluggable execution layer on top of [fn_graph](https://github.com/BusinessOpti
 ```mermaid
 graph TD
     CLI["run_pipeline.py\n(CLI entry point)"]
-    CFG["config/iris.yaml\n(which executor per node)"]
+    CFG["machine_learning_config.yaml\n(stages, executors, artifact store)"]
     ORC["PipelineComposer\n(orchestrator)"]
     ART["ArtifactStore\n(local disk or S3)"]
+    SA["StageExecutor\n(runs one stage in-memory)"]
     MEM["InMemoryExecutor\n(runs in Python process)"]
     DOC["DockerExecutor\n(spins up local container)"]
     LAM["LambdaExecutor\n(invokes AWS Lambda)"]
@@ -20,15 +21,41 @@ graph TD
     CLI --> CFG
     CLI --> ORC
     ORC --> ART
-    ORC --> MEM
-    ORC --> DOC
-    ORC --> LAM
+    ORC --> SA
+    SA --> MEM
+    SA --> DOC
+    SA --> LAM
     ORC --> LOG
 ```
 
 ---
 
-## Data Flow (one node)
+## Data Flow — Stage-Based Execution
+
+```mermaid
+sequenceDiagram
+    participant O as Orchestrator
+    participant A as ArtifactStore
+    participant S1 as StageExecutor (preprocessing)
+    participant S2 as StageExecutor (training)
+
+    O->>S1: run stage (no prior inputs needed)
+    S1->>S1: iris → data → preprocess_data (all in-memory)
+    S1->>A: put(preprocess_data)  ← boundary node
+    S1-->>O: done
+
+    O->>S2: run stage (preprocess_data ready in store)
+    S2->>A: get(preprocess_data)
+    S2->>S2: model (runs in Docker)
+    S2->>A: put(model)  ← boundary node
+    S2-->>O: done
+```
+
+On the **second run**, each stage checks whether all its boundary output nodes already exist in the artifact store. If they do, the entire stage is skipped without executing any node.
+
+---
+
+## Data Flow — Node-Level Execution (fallback)
 
 ```mermaid
 sequenceDiagram
@@ -45,39 +72,37 @@ sequenceDiagram
     O->>A: put(node, result)
 ```
 
-On the **second run**, the orchestrator asks `exists(node)?`, gets `yes`, and skips — nothing is re-executed.
-
 ---
 
 ## Folder Structure
 
 ```
 solution/
-├── run_pipeline.py        # CLI entry point
-├── composer.py            # orchestrator — walks DAG, calls executors
-├── config.py              # loads yaml, builds executors and artifact stores
-├── deploy_lambda.py       # one-shot Lambda deploy script
+├── run_pipeline.py           # CLI entry point
+├── composer.py               # orchestrator — walks DAG, calls executors or StageExecutor
+├── config.py                 # loads yaml, builds executors, artifact stores, and stages
+├── deploy_lambda.py          # one-shot Lambda deploy script
 │
-├── config/
-│   ├── iris.yaml          # iris pipeline: memory + docker + lambda
-│   └── finance.yaml       # finance pipeline: all memory
+├── machine_learning_config.yaml  # ML pipeline: memory + docker, with stage partitioning
+├── machine_learning_local.yaml   # ML pipeline: all memory, no Docker
 │
 ├── executor/
-│   ├── base.py            # BaseExecutor (abstract)
-│   ├── memory.py          # runs fn directly in process
-│   ├── docker.py          # spins up container, HTTP call, tears down
-│   └── lambda_executor.py # boto3 invoke, returns result
+│   ├── base.py               # BaseExecutor (abstract)
+│   ├── memory.py             # runs fn directly in process
+│   ├── docker.py             # spins up container, HTTP call, tears down
+│   ├── lambda_executor.py    # boto3 invoke, returns result
+│   └── stage_executor.py     # runs all nodes in one stage in-memory, persists boundaries
 │
 ├── artifact_store/
-│   ├── base.py            # BaseArtifactStore (abstract)
-│   ├── fs.py              # local disk — artifacts/{run_id}/{node}.pkl
-│   └── s3.py              # S3 — s3://bucket/{run_id}/{node}.pkl
+│   ├── base.py               # BaseArtifactStore (abstract)
+│   ├── fs.py                 # local disk — artifacts/{run_id}/{node}.pkl
+│   └── s3.py                 # S3 — s3://bucket/{run_id}/{node}.pkl
 │
 ├── worker/
-│   ├── server.py          # FastAPI app inside Docker container
-│   ├── lambda_handler.py  # handler inside Lambda
-│   ├── Dockerfile         # image for DockerExecutor
-│   └── Dockerfile.lambda  # image for LambdaExecutor (pushed to ECR)
+│   ├── server.py             # FastAPI app inside Docker container
+│   ├── lambda_handler.py     # handler inside Lambda
+│   ├── Dockerfile            # image for DockerExecutor
+│   └── Dockerfile.lambda     # image for LambdaExecutor (pushed to ECR)
 │
 └── logs/
     └── {pipeline}/{run_id}/{timestamp}.log
@@ -85,134 +110,171 @@ solution/
 
 ---
 
-## How It Works
+## How to Run
 
-### 1. Config drives everything
-```yaml
-nodes:
-  model:
-    executor: docker       # change this line to move a node
-  split_data:
-    executor: lambda
-  iris:
-    executor: memory
-```
-No pipeline code changes needed.
+### Prerequisites
 
-### 2. Orchestrator walks the DAG
-`fn_graph` builds a dependency graph from function signatures. The orchestrator walks it in topological order, checks the artifact store for cached outputs, and dispatches each node to the right executor.
-
-### 3. Executors are interchangeable
-| Executor | Where it runs | How result comes back |
-|---|---|---|
-| `memory` | Local Python process | Direct return value |
-| `docker` | Local container (per node) | HTTP response |
-| `lambda` | AWS Lambda | boto3 response payload |
-
-All three receive the same inputs and return the same result — the orchestrator doesn't care which one ran.
-
-### 4. Artifact store is the glue
-Every node output is serialized (cloudpickle) and saved after execution. The next node loads its inputs from the store — not from memory. This means:
-- Nodes can run in completely different processes / machines
-- Re-runs skip completed nodes automatically
-- Switch from `fs` to `s3` in one line to share artifacts across machines
-
----
-
-## Running a Pipeline
+Set `PYTHONPATH` so the `fn_graph` package is importable:
 
 ```cmd
-set PYTHONPATH=C:\path\to\fn_graph
-
-# iris (memory + docker + lambda)
-py run_pipeline.py --pipeline fn_graph.examples.machine_learning --config config\iris.yaml
-
-# finance (all memory)
-py run_pipeline.py --pipeline fn_graph.examples.finance --config config\finance.yaml
+set PYTHONPATH=C:\Users\GuptaGanesh\Desktop\new\fn_graph
 ```
 
-Run the same command twice — the second run skips every cached node and completes instantly. Compare the two log files in `logs/` to see the difference.
+Or on Linux/macOS:
+```bash
+export PYTHONPATH=/path/to/fn_graph
+```
+
+### Run the ML pipeline
+
+```cmd
+cd fn_graph\examples\solution
+python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config machine_learning_config.yaml
+```
+
+Run it a second time to verify memoization — all nodes should be skipped and the run completes in under a second.
+
+### Run with a different config (no Docker)
+
+```cmd
+python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config machine_learning_local.yaml
+```
+
+### Run the finance pipeline
+
+```cmd
+python run_pipeline.py --pipeline fn_graph.examples.finance --config finance_config.yaml
+```
 
 ---
 
-## One Config Per Pipeline
+## Docker Build
 
-Every fn_graph pipeline gets its own yaml file in `config/`. The config is completely independent of the pipeline code — the same pipeline can have multiple configs for different environments or experiments.
+The Docker worker image must be built before running any node with `executor: docker`:
 
-```
-config/
-├── iris.yaml          # iris: memory + docker + lambda (production-like)
-├── finance.yaml       # finance: all memory (fast local run)
-├── iris_local.yaml    # iris: all memory (no cloud needed)
-└── iris_s3.yaml       # iris: artifacts in S3 instead of local disk
+```cmd
+cd fn_graph\examples\solution
+docker build -t fn_graph_worker_v2 ./worker/
 ```
 
-### What each config controls
+This builds the FastAPI worker server that receives function source + pickled inputs over HTTP, executes the node, and returns the pickled result.
+
+---
+
+## Stage Partitioning
+
+### What it does
+
+Stage partitioning groups pipeline nodes into named stages. Within a stage, all node results pass directly in memory — no serialization to disk between steps. Only nodes at stage *boundaries* (where one stage hands off to another) are persisted to the artifact store.
+
+This reduces unnecessary I/O: in a 10-node pipeline where 8 nodes pass results internally and only 2 cross stage lines, you write 2 artifacts instead of 10.
+
+### Why it matters
+
+- Large intermediate objects (DataFrames, NumPy arrays, trained models) can be expensive to serialize.
+- Keeping intra-stage results in memory is faster and simpler.
+- Stage boundaries are natural checkpoints — exactly where you want durability.
+- Memoization granularity is at the stage level: a whole stage is skipped if all its boundary outputs already exist in the store.
+
+### How boundary nodes work
+
+When `_analyze_stage_boundaries` runs:
+- It builds a map of every node to its stage.
+- For each stage, it scans each node's predecessors and successors in the ancestor DAG.
+- A node is a **boundary output** if any of its successors belong to a different stage.
+- A node is a **boundary input** (for the consuming stage) if any of its predecessors belong to a different stage.
+- Everything else is **internal** — stays in memory, never hits the artifact store.
+
+The stage-level DAG (which stages depend on which others) is derived from these boundary relationships and used to dispatch stages in parallel.
+
+### How to define stages in YAML
 
 ```yaml
-pipeline:
-  run_id: iris_run_001        # unique ID for this run — artifacts saved here
-  on_failure: finish_running  # keep going if a node fails
+stages:
+  preprocessing:
+    executor: memory
+    nodes: [iris, data, preprocess_data, investigate_data]
 
-artifact_store:
-  type: fs                    # "fs" = local disk, "s3" = AWS S3
-  base_dir: ./artifacts       # root folder for all artifacts
+  splitting:
+    executor: memory
+    nodes: [split_data, training_features, training_target, test_features, test_target]
 
-nodes:
-  iris:
-    executor: memory          # this node runs locally
-  model:
-    executor: docker          # this node runs in a container
+  training:
+    executor: docker
     image: fn_graph_worker_v2
-  split_data:
-    executor: lambda          # this node runs on AWS Lambda
-    function_name: fn_graph_worker_lambda
-    region: us-east-1
-  "*":
-    executor: memory          # default for any node not listed above
-```
+    nodes: [model]
 
-### Switching environments
-
-To run the same iris pipeline entirely locally (no Docker, no Lambda):
-
-```yaml
-# config/iris_local.yaml
-pipeline:
-  run_id: iris_local_001
-artifact_store:
-  type: fs
-  base_dir: ./artifacts
-nodes:
-  "*":
+  evaluation:
     executor: memory
+    nodes: [predictions, classification_metrics, confusion_matrix]
 ```
 
-```cmd
-py run_pipeline.py --pipeline fn_graph.examples.machine_learning --config config\iris_local.yaml
-```
+- Every node must appear in exactly one stage.
+- The `executor` key applies to all nodes in the stage. For `docker`, also specify `image`.
+- Node order within `nodes:` does not matter — topological order is derived from the DAG.
 
-To use S3 as the artifact store instead of local disk:
+### Parallel stage dispatch
+
+Stages with no un-met dependencies are dispatched simultaneously using `ThreadPoolExecutor`. The orchestrator waits for completed stages with `FIRST_COMPLETED`, then checks which downstream stages just became unblocked, and dispatches them immediately.
+
+In the ML pipeline, `preprocessing` and (conceptually) any unrelated stage run first. Once `preprocessing` completes, `splitting` is dispatched. Once `splitting` completes, `training` is dispatched. Once `training` completes, `evaluation` is dispatched. (Linear DAG here — no parallelism between these specific stages, but the infrastructure supports parallel branches.)
+
+### How to add a new stage
+
+1. Identify which nodes belong to the new stage.
+2. Remove those nodes from their current stage's `nodes:` list.
+3. Add a new stage entry:
 
 ```yaml
+stages:
+  my_new_stage:
+    executor: memory   # or docker / lambda
+    nodes: [node_a, node_b]
+```
+
+4. The orchestrator automatically detects new boundary nodes and adjusts the stage DAG.
+
+---
+
+## Config Reference
+
+```yaml
+pipeline:
+  run_id: ml_run_001        # unique ID — artifacts saved under artifacts/{run_id}/
+  on_failure: finish_running  # keep going if a node fails (currently informational)
+
 artifact_store:
-  type: s3
-  bucket: fn-graph-pipeline-artifacts
+  type: fs                  # "fs" = local disk, "s3" = AWS S3
+  base_dir: ./artifacts     # root folder for all artifacts (fs only)
+  # For S3:
+  # bucket: my-fn-graph-bucket
+  # region: us-east-1
+
+stages:                     # optional — enables stage-based execution
+  stage_name:
+    executor: memory        # executor for all nodes in this stage
+    nodes: [node1, node2]
+
+nodes:                      # fallback node-level config (used when no stages: defined)
+  model:
+    executor: docker
+    image: fn_graph_worker_v2
+  "*":
+    executor: memory        # default for any node not listed above
 ```
 
-No other changes. The orchestrator, executors, and pipeline code are untouched.
+---
 
-### Adding a brand new pipeline
+## Environment Variables
 
-1. Write (or point at) any Python module that ends with `f = Composer()...`
-2. Create `config/{name}.yaml` with its node names and executors
-3. Run:
+| Variable | Purpose | Default |
+|---|---|---|
+| `PYTHONPATH` | Makes `fn_graph` importable | Must be set manually |
+| `AWS_REGION` | Region for Lambda executor | From boto3 config |
+| `AWS_ACCESS_KEY_ID` | AWS credentials for S3/Lambda | From AWS config |
+| `AWS_SECRET_ACCESS_KEY` | AWS credentials for S3/Lambda | From AWS config |
 
-```cmd
-py run_pipeline.py --pipeline your.module.path --config config\name.yaml
-```
-
-That's it. The orchestration layer discovers nodes from the DAG automatically.
+A `.env` file in the solution directory is loaded automatically if `python-dotenv` is installed.
 
 ---
 
@@ -223,33 +285,46 @@ Every run writes a timestamped log file so you can compare runs side by side.
 ```
 logs/
 ├── machine_learning/
-│   └── iris_run_001/
-│       ├── 2026-04-01_10-00-00.log   ← first run
-│       └── 2026-04-01_10-05-00.log   ← second run
+│   └── ml_run_001/
+│       ├── 2026-04-09_10-00-00.log   ← first run
+│       └── 2026-04-09_10-05-00.log   ← second run (all memoized)
 └── finance/
     └── finance_run_001/
-        └── 2026-04-01_10-10-00.log
+        └── 2026-04-09_10-10-00.log
 ```
 
 Log path pattern: `logs/{pipeline_name}/{run_id}/{timestamp}.log`
 
 ### What the logs show
 
-**First run** — every node executes:
+**First run — stage boundary analysis:**
 ```
-[PipelineComposer] --- node: model (12/15) ---
-[LocalFSArtifactStore] exists(model): False
+[PipelineComposer] === Stage Boundary Analysis ===
+[PipelineComposer] stage 'preprocessing':
+  inputs   (load from store): []
+  outputs  (save to store):   ['preprocess_data']
+  internal (memory only):     ['data', 'investigate_data', 'iris']
+```
+
+**First run — parallel stage dispatch:**
+```
+[PipelineComposer] dispatching 1 stage(s) in parallel: ['preprocessing']
+[PipelineComposer] stage 'preprocessing' finished, checking downstream stages
+[PipelineComposer] stage 'splitting' unblocked — dispatching
+```
+
+**First run — Docker container lifecycle:**
+```
 [DockerExecutor] starting container for node: model
 [DockerExecutor] container healthy, sending work
-[DockerExecutor] node model complete, output type: LogisticRegression
+[DockerExecutor] node model complete, output type: LinearRegression
 [DockerExecutor] container stopped and removed
 ```
 
-**Second run** — every cached node is skipped:
+**Second run — entire stage skipped:**
 ```
-[PipelineComposer] --- node: model (12/15) ---
-[LocalFSArtifactStore] exists(model): True
-[PipelineComposer] output exists, skipping: model
+[PipelineComposer] stage 'preprocessing' fully memoized — skipping
+[PipelineComposer] stage 'training' fully memoized — skipping
 ```
 
 ### Forcing a fresh run
@@ -258,13 +333,13 @@ Change `run_id` in the yaml — a new ID means a new artifact folder, so everyth
 
 ```yaml
 pipeline:
-  run_id: iris_run_002    # was iris_run_001
+  run_id: ml_run_002    # was ml_run_001
 ```
 
-Or delete just the nodes you want to re-run:
+Or delete specific artifacts:
 
 ```cmd
-del artifacts\iris_run_001\model.pkl
+del artifacts\ml_run_001\model.pkl
 ```
 
-On the next run, only `model` and its downstream nodes will re-execute — everything upstream stays cached.
+On the next run, the `training` stage re-executes (and `evaluation` downstream of it), while `preprocessing` and `splitting` remain cached.
