@@ -58,3 +58,32 @@ def get_artifact_store(config: dict):
 def get_node_config(config: dict, node_name: str) -> dict:
     nodes = config.get("nodes", {})
     return nodes.get(node_name) or nodes.get("*", {"executor": "memory"})
+
+
+def load_stages(config: dict) -> dict:
+    """
+    Read the top-level `stages:` key from config and return a dict of stage definitions.
+
+    Each stage definition contains at minimum:
+      - executor: the executor type for all nodes in this stage
+      - nodes: list of node names belonging to this stage
+
+    If no `stages:` key exists (e.g. older configs), returns empty dict so the
+    caller can fall back to node-level execution transparently.
+
+    Example return value:
+    {
+      "preprocessing": {"executor": "memory", "nodes": ["iris", "data", "preprocess_data"]},
+      "training":      {"executor": "docker",  "image": "fn_graph_worker_v2", "nodes": ["model"]},
+    }
+    """
+    stages = config.get("stages", {})
+    if stages:
+        print(f"[config] stages defined: {list(stages.keys())}", flush=True)
+        for stage_name, stage_def in stages.items():
+            nodes = stage_def.get("nodes", [])
+            executor = stage_def.get("executor", "memory")
+            print(f"[config]   stage '{stage_name}': executor={executor}, nodes={nodes}", flush=True)
+    else:
+        print("[config] no stages defined — using node-level execution", flush=True)
+    return stages

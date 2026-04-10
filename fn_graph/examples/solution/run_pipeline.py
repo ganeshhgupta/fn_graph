@@ -135,6 +135,7 @@ def main():
         _source_map=f._source_map,
         execution_config=execution_config,
         artifact_store=artifact_store,
+        pipeline_config=config,
     )
 
     # Leaf nodes (out-degree == 0, not parameters) are the pipeline's final outputs.
