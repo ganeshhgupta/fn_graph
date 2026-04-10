@@ -1,0 +1,306 @@
+[run_pipeline] logging to: C:\Users\GuptaGanesh\Desktop\new\fn_graph\fn_graph\examples\solution\logs\machine_learning\ml_run_nomem_001\2026-04-06_17-54-31.log
+[config] creating artifact store: fs
+[run_pipeline] artifact store: LocalFSArtifactStore
+[run_pipeline] executors configured:
+  model_type: memory
+  do_preprocess: memory
+  iris: memory
+  data: memory
+  preprocess_data: memory
+  investigate_data: memory
+  split_data: memory
+  training_features: memory
+  training_target: memory
+  test_features: memory
+  test_target: memory
+  model: memory
+  predictions: memory
+  classification_metrics: memory
+  confusion_matrix: memory
+[run_pipeline] leaf outputs: ['investigate_data', 'classification_metrics', 'confusion_matrix']
+
+[PipelineComposer] pipeline run started
+[PipelineComposer] subclass of fn_graph Composer confirmed
+[PipelineComposer] outputs requested: ['investigate_data', 'classification_metrics', 'confusion_matrix']
+[PipelineComposer] execution order: ['model_type', 'do_preprocess', 'iris', 'data', 'preprocess_data', 'investigate_data', 'split_data', 'training_features', 'training_target', 'test_features', 'test_target', 'model', 'predictions', 'classification_metrics', 'confusion_matrix']
+[PipelineComposer] parameters: ['model_type', 'do_preprocess']
+
+[PipelineComposer] seeding parameters into artifact store
+[LocalFSArtifactStore] writing model_type to artifacts\ml_run_nomem_001\model_type.pkl
+[LocalFSArtifactStore] model_type written, size: 18 bytes
+[PipelineComposer] seeded: model_type = ols
+[LocalFSArtifactStore] writing do_preprocess to artifacts\ml_run_nomem_001\do_preprocess.pkl
+[LocalFSArtifactStore] do_preprocess written, size: 4 bytes
+[PipelineComposer] seeded: do_preprocess = True
+[PipelineComposer] initial ready nodes: ['iris']
+[PipelineComposer] iris running in thread 23124
+[LocalFSArtifactStore] exists(iris): False
+[config] creating executor: memory
+[PipelineComposer] dispatching iris to InMemoryExecutor
+[InMemoryExecutor] running node: iris directly in process
+[InMemoryExecutor] inputs: []
+[InMemoryExecutor] node iris complete, output type: Bunch
+[LocalFSArtifactStore] writing iris to artifacts\ml_run_nomem_001\iris.pkl
+[LocalFSArtifactStore] iris written, size: 9341 bytes
+[PipelineComposer] iris complete
+[PipelineComposer] iris done, checking unblocked nodes
+[PipelineComposer] unblocked: data, dispatching
+[PipelineComposer] data running in thread 23124
+[LocalFSArtifactStore] exists(data): False
+[LocalFSArtifactStore] loading iris from artifacts\ml_run_nomem_001\iris.pkl
+[LocalFSArtifactStore] iris loaded, type: Bunch
+[config] creating executor: memory
+[PipelineComposer] dispatching data to InMemoryExecutor
+[InMemoryExecutor] running node: data directly in process
+[InMemoryExecutor] inputs: ['iris']
+[InMemoryExecutor] node data complete, output type: DataFrame
+[LocalFSArtifactStore] writing data to artifacts\ml_run_nomem_001\data.pkl
+[LocalFSArtifactStore] data written, size: 6894 bytes
+[PipelineComposer] data complete
+[PipelineComposer] data done, checking unblocked nodes
+[PipelineComposer] unblocked: preprocess_data, dispatching
+[PipelineComposer] unblocked: investigate_data, dispatching
+[PipelineComposer] preprocess_data running in thread 23124
+[LocalFSArtifactStore] exists(preprocess_data): False
+[LocalFSArtifactStore] loading data from artifacts\ml_run_nomem_001\data.pkl
+[PipelineComposer] investigate_data running in thread 18796
+[LocalFSArtifactStore] exists(investigate_data): False
+[LocalFSArtifactStore] loading data from artifacts\ml_run_nomem_001\data.pkl
+[LocalFSArtifactStore] data loaded, type: DataFrame
+[LocalFSArtifactStore] loading do_preprocess from artifacts\ml_run_nomem_001\do_preprocess.pkl
+[LocalFSArtifactStore] data loaded, type: DataFrame
+[config] creating executor: memory
+[PipelineComposer] dispatching investigate_data to InMemoryExecutor
+[InMemoryExecutor] running node: investigate_data directly in process
+[InMemoryExecutor] inputs: ['data']
+[LocalFSArtifactStore] do_preprocess loaded, type: bool
+[config] creating executor: memory
+[PipelineComposer] dispatching preprocess_data to InMemoryExecutor
+[InMemoryExecutor] running node: preprocess_data directly in process
+[InMemoryExecutor] inputs: ['data', 'do_preprocess']
+[InMemoryExecutor] node preprocess_data complete, output type: DataFrame
+[LocalFSArtifactStore] writing preprocess_data to artifacts\ml_run_nomem_001\preprocess_data.pkl
+[LocalFSArtifactStore] preprocess_data written, size: 6894 bytes
+[PipelineComposer] preprocess_data complete
+[PipelineComposer] preprocess_data done, checking unblocked nodes
+[PipelineComposer] unblocked: split_data, dispatching
+[PipelineComposer] split_data running in thread 23124
+[LocalFSArtifactStore] exists(split_data): False
+[LocalFSArtifactStore] loading preprocess_data from artifacts\ml_run_nomem_001\preprocess_data.pkl
+[LocalFSArtifactStore] preprocess_data loaded, type: DataFrame
+[config] creating executor: memory
+[PipelineComposer] dispatching split_data to InMemoryExecutor
+[InMemoryExecutor] running node: split_data directly in process
+[InMemoryExecutor] inputs: ['preprocess_data']
+[InMemoryExecutor] node split_data complete, output type: dict
+[LocalFSArtifactStore] writing split_data to artifacts\ml_run_nomem_001\split_data.pkl
+[LocalFSArtifactStore] split_data written, size: 11248 bytes
+[PipelineComposer] split_data complete
+[PipelineComposer] split_data done, checking unblocked nodes
+[PipelineComposer] unblocked: training_features, dispatching
+[PipelineComposer] unblocked: training_target, dispatching
+[PipelineComposer] training_features running in thread 23124
+[LocalFSArtifactStore] exists(training_features): False
+[PipelineComposer] training_target running in thread 36168
+[PipelineComposer] unblocked: test_features, dispatching
+[LocalFSArtifactStore] loading split_data from artifacts\ml_run_nomem_001\split_data.pkl
+[LocalFSArtifactStore] exists(training_target): False
+[LocalFSArtifactStore] loading split_data from artifacts\ml_run_nomem_001\split_data.pkl
+[PipelineComposer] test_features running in thread 21324
+[LocalFSArtifactStore] exists(test_features): False
+[LocalFSArtifactStore] loading split_data from artifacts\ml_run_nomem_001\split_data.pkl
+[PipelineComposer] unblocked: test_target, dispatching
+[PipelineComposer] test_target running in thread 34460
+[LocalFSArtifactStore] exists(test_target): False
+[LocalFSArtifactStore] loading split_data from artifacts\ml_run_nomem_001\split_data.pkl
+[LocalFSArtifactStore] split_data loaded, type: dict
+[config] creating executor: memory
+[PipelineComposer] dispatching training_target to InMemoryExecutor
+[InMemoryExecutor] running node: training_target directly in process
+[InMemoryExecutor] inputs: ['split_data']
+[LocalFSArtifactStore] split_data loaded, type: dict
+[LocalFSArtifactStore] split_data loaded, type: dict
+[config] creating executor: memory
+[config] creating executor: memory
+[PipelineComposer] dispatching training_features to InMemoryExecutor
+[InMemoryExecutor] running node: training_features directly in process
+[InMemoryExecutor] inputs: ['split_data']
+[InMemoryExecutor] node training_features complete, output type: DataFrame
+[config] creating executor: memory
+[PipelineComposer] dispatching test_features to InMemoryExecutor
+[InMemoryExecutor] running node: test_features directly in process
+[InMemoryExecutor] node training_target complete, output type: Series
+[LocalFSArtifactStore] split_data loaded, type: dict
+[InMemoryExecutor] inputs: ['split_data']
+[LocalFSArtifactStore] writing training_target to artifacts\ml_run_nomem_001\training_target.pkl
+[InMemoryExecutor] node test_features complete, output type: DataFrame
+[PipelineComposer] dispatching test_target to InMemoryExecutor
+[LocalFSArtifactStore] training_target written, size: 3328 bytes
+[PipelineComposer] training_target complete
+[LocalFSArtifactStore] writing training_features to artifacts\ml_run_nomem_001\training_features.pkl
+[InMemoryExecutor] running node: test_target directly in process
+[PipelineComposer] training_target done, checking unblocked nodes
+[LocalFSArtifactStore] writing test_features to artifacts\ml_run_nomem_001\test_features.pkl
+[InMemoryExecutor] inputs: ['split_data']
+[InMemoryExecutor] node test_target complete, output type: Series
+[LocalFSArtifactStore] writing test_target to artifacts\ml_run_nomem_001\test_target.pkl
+[LocalFSArtifactStore] training_features written, size: 5323 bytes
+[PipelineComposer] training_features complete
+[PipelineComposer] training_features done, checking unblocked nodes
+[PipelineComposer] unblocked: model, dispatching
+[PipelineComposer] model running in thread 36168
+[LocalFSArtifactStore] exists(model): False
+[LocalFSArtifactStore] test_features written, size: 2363 bytes
+[LocalFSArtifactStore] test_target written, size: 1552 bytes
+[LocalFSArtifactStore] loading training_features from artifacts\ml_run_nomem_001\training_features.pkl
+[PipelineComposer] test_features complete
+[PipelineComposer] test_target complete
+[PipelineComposer] test_features done, checking unblocked nodes
+[LocalFSArtifactStore] training_features loaded, type: DataFrame
+[LocalFSArtifactStore] loading training_target from artifacts\ml_run_nomem_001\training_target.pkl
+[PipelineComposer] test_target done, checking unblocked nodes
+[LocalFSArtifactStore] training_target loaded, type: Series
+[LocalFSArtifactStore] loading model_type from artifacts\ml_run_nomem_001\model_type.pkl
+[LocalFSArtifactStore] model_type loaded, type: str
+[config] creating executor: memory
+[PipelineComposer] dispatching model to InMemoryExecutor
+[InMemoryExecutor] running node: model directly in process
+[InMemoryExecutor] inputs: ['training_features', 'training_target', 'model_type']
+[InMemoryExecutor] node model complete, output type: LogisticRegression
+[LocalFSArtifactStore] writing model to artifacts\ml_run_nomem_001\model.pkl
+[LocalFSArtifactStore] model written, size: 955 bytes
+[PipelineComposer] model complete
+[PipelineComposer] model done, checking unblocked nodes
+[PipelineComposer] unblocked: predictions, dispatching
+[PipelineComposer] predictions running in thread 23124
+[LocalFSArtifactStore] exists(predictions): False
+[LocalFSArtifactStore] loading model from artifacts\ml_run_nomem_001\model.pkl
+[LocalFSArtifactStore] model loaded, type: LogisticRegression
+[LocalFSArtifactStore] loading test_features from artifacts\ml_run_nomem_001\test_features.pkl
+[LocalFSArtifactStore] test_features loaded, type: DataFrame
+[config] creating executor: memory
+[PipelineComposer] dispatching predictions to InMemoryExecutor
+[InMemoryExecutor] running node: predictions directly in process
+[InMemoryExecutor] inputs: ['model', 'test_features']
+[InMemoryExecutor] node predictions complete, output type: ndarray
+[LocalFSArtifactStore] writing predictions to artifacts\ml_run_nomem_001\predictions.pkl
+[LocalFSArtifactStore] predictions written, size: 455 bytes
+[PipelineComposer] predictions complete
+[PipelineComposer] predictions done, checking unblocked nodes
+[PipelineComposer] unblocked: classification_metrics, dispatching
+[PipelineComposer] unblocked: confusion_matrix, dispatching
+[PipelineComposer] classification_metrics running in thread 34460
+[LocalFSArtifactStore] exists(classification_metrics): False
+[PipelineComposer] confusion_matrix running in thread 36168
+[LocalFSArtifactStore] loading predictions from artifacts\ml_run_nomem_001\predictions.pkl
+[LocalFSArtifactStore] exists(confusion_matrix): False
+[LocalFSArtifactStore] loading predictions from artifacts\ml_run_nomem_001\predictions.pkl
+[LocalFSArtifactStore] predictions loaded, type: ndarray
+[LocalFSArtifactStore] loading test_target from artifacts\ml_run_nomem_001\test_target.pkl
+[LocalFSArtifactStore] predictions loaded, type: ndarray
+[LocalFSArtifactStore] loading test_target from artifacts\ml_run_nomem_001\test_target.pkl
+[LocalFSArtifactStore] test_target loaded, type: Series
+[config] creating executor: memory
+[PipelineComposer] dispatching confusion_matrix to InMemoryExecutor
+[InMemoryExecutor] running node: confusion_matrix directly in process
+[InMemoryExecutor] inputs: ['predictions', 'test_target']
+[LocalFSArtifactStore] test_target loaded, type: Series
+[config] creating executor: memory
+[PipelineComposer] dispatching classification_metrics to InMemoryExecutor
+[InMemoryExecutor] running node: classification_metrics directly in process
+[InMemoryExecutor] inputs: ['predictions', 'test_target']
+[InMemoryExecutor] node classification_metrics complete, output type: str
+[LocalFSArtifactStore] writing classification_metrics to artifacts\ml_run_nomem_001\classification_metrics.pkl
+[LocalFSArtifactStore] classification_metrics written, size: 398 bytes
+[PipelineComposer] classification_metrics complete
+[PipelineComposer] classification_metrics done, checking unblocked nodes
+[InMemoryExecutor] node confusion_matrix complete, output type: Figure
+[LocalFSArtifactStore] writing confusion_matrix to artifacts\ml_run_nomem_001\confusion_matrix.pkl
+[LocalFSArtifactStore] confusion_matrix written, size: 1903289 bytes
+[PipelineComposer] confusion_matrix complete
+[PipelineComposer] confusion_matrix done, checking unblocked nodes
+[InMemoryExecutor] node investigate_data complete, output type: PairGrid
+[LocalFSArtifactStore] writing investigate_data to artifacts\ml_run_nomem_001\investigate_data.pkl
+[LocalFSArtifactStore] investigate_data written, size: 1990917 bytes
+[PipelineComposer] investigate_data complete
+[PipelineComposer] investigate_data done, checking unblocked nodes
+
+[PipelineComposer] pipeline complete
+[LocalFSArtifactStore] exists(model_type): True
+[LocalFSArtifactStore] loading model_type from artifacts\ml_run_nomem_001\model_type.pkl
+[LocalFSArtifactStore] model_type loaded, type: str
+[LocalFSArtifactStore] exists(do_preprocess): True
+[LocalFSArtifactStore] loading do_preprocess from artifacts\ml_run_nomem_001\do_preprocess.pkl
+[LocalFSArtifactStore] do_preprocess loaded, type: bool
+[LocalFSArtifactStore] exists(iris): True
+[LocalFSArtifactStore] loading iris from artifacts\ml_run_nomem_001\iris.pkl
+[LocalFSArtifactStore] iris loaded, type: Bunch
+[LocalFSArtifactStore] exists(data): True
+[LocalFSArtifactStore] loading data from artifacts\ml_run_nomem_001\data.pkl
+[LocalFSArtifactStore] data loaded, type: DataFrame
+[LocalFSArtifactStore] exists(preprocess_data): True
+[LocalFSArtifactStore] loading preprocess_data from artifacts\ml_run_nomem_001\preprocess_data.pkl
+[LocalFSArtifactStore] preprocess_data loaded, type: DataFrame
+[LocalFSArtifactStore] exists(investigate_data): True
+[LocalFSArtifactStore] loading investigate_data from artifacts\ml_run_nomem_001\investigate_data.pkl
+[LocalFSArtifactStore] investigate_data loaded, type: PairGrid
+[LocalFSArtifactStore] exists(split_data): True
+[LocalFSArtifactStore] loading split_data from artifacts\ml_run_nomem_001\split_data.pkl
+[LocalFSArtifactStore] split_data loaded, type: dict
+[LocalFSArtifactStore] exists(training_features): True
+[LocalFSArtifactStore] loading training_features from artifacts\ml_run_nomem_001\training_features.pkl
+[LocalFSArtifactStore] training_features loaded, type: DataFrame
+[LocalFSArtifactStore] exists(training_target): True
+[LocalFSArtifactStore] loading training_target from artifacts\ml_run_nomem_001\training_target.pkl
+[LocalFSArtifactStore] training_target loaded, type: Series
+[LocalFSArtifactStore] exists(test_features): True
+[LocalFSArtifactStore] loading test_features from artifacts\ml_run_nomem_001\test_features.pkl
+[LocalFSArtifactStore] test_features loaded, type: DataFrame
+[LocalFSArtifactStore] exists(test_target): True
+[LocalFSArtifactStore] loading test_target from artifacts\ml_run_nomem_001\test_target.pkl
+[LocalFSArtifactStore] test_target loaded, type: Series
+[LocalFSArtifactStore] exists(model): True
+[LocalFSArtifactStore] loading model from artifacts\ml_run_nomem_001\model.pkl
+[LocalFSArtifactStore] model loaded, type: LogisticRegression
+[LocalFSArtifactStore] exists(predictions): True
+[LocalFSArtifactStore] loading predictions from artifacts\ml_run_nomem_001\predictions.pkl
+[LocalFSArtifactStore] predictions loaded, type: ndarray
+[LocalFSArtifactStore] exists(classification_metrics): True
+[LocalFSArtifactStore] loading classification_metrics from artifacts\ml_run_nomem_001\classification_metrics.pkl
+[LocalFSArtifactStore] classification_metrics loaded, type: str
+[LocalFSArtifactStore] exists(confusion_matrix): True
+[LocalFSArtifactStore] loading confusion_matrix from artifacts\ml_run_nomem_001\confusion_matrix.pkl
+[LocalFSArtifactStore] confusion_matrix loaded, type: Figure
+
+============================================================
+=== Pipeline Results ===
+
+[model_type]
+ols
+[do_preprocess] True
+[iris] Bunch
+[data] DataFrame
+[preprocess_data] DataFrame
+[investigate_data] PairGrid
+[split_data] dict
+[training_features] DataFrame
+[training_target] Series
+[test_features] DataFrame
+[test_target] Series
+[model] LogisticRegression
+[predictions] ndarray
+
+[classification_metrics]
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00        14
+           1       1.00      0.86      0.92        14
+           2       0.83      1.00      0.91        10
+
+    accuracy                           0.95        38
+   macro avg       0.94      0.95      0.94        38
+weighted avg       0.96      0.95      0.95        38
+
+[confusion_matrix] figure saved to confusion_matrix.png
+
+[run_pipeline] log saved to: C:\Users\GuptaGanesh\Desktop\new\fn_graph\fn_graph\examples\solution\logs\machine_learning\ml_run_nomem_001\2026-04-06_17-54-31.log

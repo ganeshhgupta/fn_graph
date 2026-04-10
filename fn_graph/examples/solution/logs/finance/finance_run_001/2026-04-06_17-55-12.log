@@ -1,0 +1,233 @@
+[run_pipeline] logging to: C:\Users\GuptaGanesh\Desktop\new\fn_graph\fn_graph\examples\solution\logs\finance\finance_run_001\2026-04-06_17-55-12.log
+[config] creating artifact store: fs
+[run_pipeline] artifact store: LocalFSArtifactStore
+[run_pipeline] executors configured:
+  closing_prices: memory
+  normalised_returns: memory
+  positions: memory
+  total_position: memory
+  positions_plot: memory
+  cumulative_return: memory
+  daily_return: memory
+  sharpe_ratio: memory
+  annual_sharpe_ratio: memory
+  share_allocations: memory
+  initial_total_position: memory
+  start_date: memory
+  end_date: memory
+[run_pipeline] leaf outputs: ['positions_plot', 'cumulative_return', 'annual_sharpe_ratio']
+
+[PipelineComposer] pipeline run started
+[PipelineComposer] subclass of fn_graph Composer confirmed
+[PipelineComposer] outputs requested: ['positions_plot', 'cumulative_return', 'annual_sharpe_ratio']
+[PipelineComposer] execution order: ['share_allocations', 'initial_total_position', 'start_date', 'end_date', 'closing_prices', 'normalised_returns', 'positions', 'total_position', 'positions_plot', 'cumulative_return', 'daily_return', 'sharpe_ratio', 'annual_sharpe_ratio']
+[PipelineComposer] parameters: ['share_allocations', 'initial_total_position', 'start_date', 'end_date']
+
+[PipelineComposer] seeding parameters into artifact store
+[LocalFSArtifactStore] writing share_allocations to artifacts\finance_run_001\share_allocations.pkl
+[LocalFSArtifactStore] share_allocations written, size: 79 bytes
+[PipelineComposer] seeded: share_allocations = {'AAPL': 0.25, 'MSFT': 0.25, 'ORCL': 0.3, 'IBM': 0.2}
+[LocalFSArtifactStore] writing initial_total_position to artifacts\finance_run_001\initial_total_position.pkl
+[LocalFSArtifactStore] initial_total_position written, size: 17 bytes
+[PipelineComposer] seeded: initial_total_position = 100000000
+[LocalFSArtifactStore] writing start_date to artifacts\finance_run_001\start_date.pkl
+[LocalFSArtifactStore] start_date written, size: 25 bytes
+[PipelineComposer] seeded: start_date = 2017-01-01
+[LocalFSArtifactStore] writing end_date to artifacts\finance_run_001\end_date.pkl
+[LocalFSArtifactStore] end_date written, size: 43 bytes
+[PipelineComposer] seeded: end_date = 2026-04-06
+[PipelineComposer] initial ready nodes: ['closing_prices']
+[PipelineComposer] closing_prices running in thread 37836
+[LocalFSArtifactStore] exists(closing_prices): False
+[LocalFSArtifactStore] loading share_allocations from artifacts\finance_run_001\share_allocations.pkl
+[LocalFSArtifactStore] share_allocations loaded, type: dict
+[LocalFSArtifactStore] loading start_date from artifacts\finance_run_001\start_date.pkl
+[LocalFSArtifactStore] start_date loaded, type: str
+[LocalFSArtifactStore] loading end_date from artifacts\finance_run_001\end_date.pkl
+[LocalFSArtifactStore] end_date loaded, type: date
+[config] creating executor: memory
+[PipelineComposer] dispatching closing_prices to InMemoryExecutor
+[InMemoryExecutor] running node: closing_prices directly in process
+[InMemoryExecutor] inputs: ['share_allocations', 'start_date', 'end_date']
+[InMemoryExecutor] node closing_prices complete, output type: DataFrame
+[LocalFSArtifactStore] writing closing_prices to artifacts\finance_run_001\closing_prices.pkl
+[LocalFSArtifactStore] closing_prices written, size: 94202 bytes
+[PipelineComposer] closing_prices complete
+[PipelineComposer] closing_prices done, checking unblocked nodes
+[PipelineComposer] unblocked: normalised_returns, dispatching
+[PipelineComposer] normalised_returns running in thread 37836
+[LocalFSArtifactStore] exists(normalised_returns): False
+[LocalFSArtifactStore] loading closing_prices from artifacts\finance_run_001\closing_prices.pkl
+[LocalFSArtifactStore] closing_prices loaded, type: DataFrame
+[config] creating executor: memory
+[PipelineComposer] dispatching normalised_returns to InMemoryExecutor
+[InMemoryExecutor] running node: normalised_returns directly in process
+[InMemoryExecutor] inputs: ['closing_prices']
+[InMemoryExecutor] node normalised_returns complete, output type: DataFrame
+[LocalFSArtifactStore] writing normalised_returns to artifacts\finance_run_001\normalised_returns.pkl
+[LocalFSArtifactStore] normalised_returns written, size: 94226 bytes
+[PipelineComposer] normalised_returns complete
+[PipelineComposer] normalised_returns done, checking unblocked nodes
+[PipelineComposer] unblocked: positions, dispatching
+[PipelineComposer] positions running in thread 37836
+[LocalFSArtifactStore] exists(positions): False
+[LocalFSArtifactStore] loading normalised_returns from artifacts\finance_run_001\normalised_returns.pkl
+[LocalFSArtifactStore] normalised_returns loaded, type: DataFrame
+[LocalFSArtifactStore] loading share_allocations from artifacts\finance_run_001\share_allocations.pkl
+[LocalFSArtifactStore] share_allocations loaded, type: dict
+[LocalFSArtifactStore] loading initial_total_position from artifacts\finance_run_001\initial_total_position.pkl
+[LocalFSArtifactStore] initial_total_position loaded, type: int
+[config] creating executor: memory
+[PipelineComposer] dispatching positions to InMemoryExecutor
+[InMemoryExecutor] running node: positions directly in process
+[InMemoryExecutor] inputs: ['normalised_returns', 'share_allocations', 'initial_total_position']
+[InMemoryExecutor] node positions complete, output type: DataFrame
+[LocalFSArtifactStore] writing positions to artifacts\finance_run_001\positions.pkl
+[LocalFSArtifactStore] positions written, size: 94049 bytes
+[PipelineComposer] positions complete
+[PipelineComposer] positions done, checking unblocked nodes
+[PipelineComposer] unblocked: total_position, dispatching
+[PipelineComposer] unblocked: positions_plot, dispatching
+[PipelineComposer] total_position running in thread 37836
+[LocalFSArtifactStore] exists(total_position): False
+[LocalFSArtifactStore] loading positions from artifacts\finance_run_001\positions.pkl
+[PipelineComposer] positions_plot running in thread 13240
+[LocalFSArtifactStore] exists(positions_plot): False
+[LocalFSArtifactStore] loading positions from artifacts\finance_run_001\positions.pkl
+[LocalFSArtifactStore] positions loaded, type: DataFrame
+[config] creating executor: memory
+[PipelineComposer] dispatching total_position to InMemoryExecutor
+[LocalFSArtifactStore] positions loaded, type: DataFrame
+[InMemoryExecutor] running node: total_position directly in process
+[config] creating executor: memory
+[InMemoryExecutor] inputs: ['positions']
+[PipelineComposer] dispatching positions_plot to InMemoryExecutor
+[InMemoryExecutor] running node: positions_plot directly in process
+[InMemoryExecutor] inputs: ['positions']
+[InMemoryExecutor] node total_position complete, output type: Series
+[LocalFSArtifactStore] writing total_position to artifacts\finance_run_001\total_position.pkl
+[LocalFSArtifactStore] total_position written, size: 56712 bytes
+[PipelineComposer] total_position complete
+[PipelineComposer] total_position done, checking unblocked nodes
+[PipelineComposer] unblocked: cumulative_return, dispatching
+[PipelineComposer] unblocked: daily_return, dispatching
+[PipelineComposer] cumulative_return running in thread 37836
+[PipelineComposer] daily_return running in thread 4296
+[LocalFSArtifactStore] exists(cumulative_return): False
+[LocalFSArtifactStore] loading total_position from artifacts\finance_run_001\total_position.pkl
+[LocalFSArtifactStore] exists(daily_return): False
+[LocalFSArtifactStore] loading total_position from artifacts\finance_run_001\total_position.pkl
+[LocalFSArtifactStore] total_position loaded, type: Series
+[config] creating executor: memory
+[PipelineComposer] dispatching daily_return to InMemoryExecutor
+[InMemoryExecutor] running node: daily_return directly in process
+[InMemoryExecutor] inputs: ['total_position']
+[LocalFSArtifactStore] total_position loaded, type: Series
+[InMemoryExecutor] node daily_return complete, output type: Series
+[config] creating executor: memory
+[LocalFSArtifactStore] writing daily_return to artifacts\finance_run_001\daily_return.pkl
+[PipelineComposer] dispatching cumulative_return to InMemoryExecutor
+[InMemoryExecutor] node positions_plot complete, output type: Axes
+[InMemoryExecutor] running node: cumulative_return directly in process
+[InMemoryExecutor] inputs: ['total_position']
+[LocalFSArtifactStore] writing positions_plot to artifacts\finance_run_001\positions_plot.pkl
+[InMemoryExecutor] node cumulative_return complete, output type: float64
+[LocalFSArtifactStore] writing cumulative_return to artifacts\finance_run_001\cumulative_return.pkl
+[LocalFSArtifactStore] daily_return written, size: 56712 bytes
+[PipelineComposer] daily_return complete
+[PipelineComposer] daily_return done, checking unblocked nodes
+[PipelineComposer] unblocked: sharpe_ratio, dispatching
+[LocalFSArtifactStore] cumulative_return written, size: 117 bytes
+[PipelineComposer] cumulative_return complete
+[PipelineComposer] sharpe_ratio running in thread 4296
+[PipelineComposer] cumulative_return done, checking unblocked nodes
+[LocalFSArtifactStore] exists(sharpe_ratio): False
+[LocalFSArtifactStore] loading daily_return from artifacts\finance_run_001\daily_return.pkl
+[LocalFSArtifactStore] positions_plot written, size: 700283 bytes
+[PipelineComposer] positions_plot complete
+[PipelineComposer] positions_plot done, checking unblocked nodes
+[LocalFSArtifactStore] daily_return loaded, type: Series
+[config] creating executor: memory
+[PipelineComposer] dispatching sharpe_ratio to InMemoryExecutor
+[InMemoryExecutor] running node: sharpe_ratio directly in process
+[InMemoryExecutor] inputs: ['daily_return']
+[InMemoryExecutor] node sharpe_ratio complete, output type: float64
+[LocalFSArtifactStore] writing sharpe_ratio to artifacts\finance_run_001\sharpe_ratio.pkl
+[LocalFSArtifactStore] sharpe_ratio written, size: 117 bytes
+[PipelineComposer] sharpe_ratio complete
+[PipelineComposer] sharpe_ratio done, checking unblocked nodes
+[PipelineComposer] unblocked: annual_sharpe_ratio, dispatching
+[PipelineComposer] annual_sharpe_ratio running in thread 37836
+[LocalFSArtifactStore] exists(annual_sharpe_ratio): False
+[LocalFSArtifactStore] loading sharpe_ratio from artifacts\finance_run_001\sharpe_ratio.pkl
+[LocalFSArtifactStore] sharpe_ratio loaded, type: float64
+[config] creating executor: memory
+[PipelineComposer] dispatching annual_sharpe_ratio to InMemoryExecutor
+[InMemoryExecutor] running node: annual_sharpe_ratio directly in process
+[InMemoryExecutor] inputs: ['sharpe_ratio']
+[InMemoryExecutor] node annual_sharpe_ratio complete, output type: float64
+[LocalFSArtifactStore] writing annual_sharpe_ratio to artifacts\finance_run_001\annual_sharpe_ratio.pkl
+[LocalFSArtifactStore] annual_sharpe_ratio written, size: 117 bytes
+[PipelineComposer] annual_sharpe_ratio complete
+[PipelineComposer] annual_sharpe_ratio done, checking unblocked nodes
+
+[PipelineComposer] pipeline complete
+[LocalFSArtifactStore] exists(closing_prices): True
+[LocalFSArtifactStore] loading closing_prices from artifacts\finance_run_001\closing_prices.pkl
+[LocalFSArtifactStore] closing_prices loaded, type: DataFrame
+[LocalFSArtifactStore] exists(normalised_returns): True
+[LocalFSArtifactStore] loading normalised_returns from artifacts\finance_run_001\normalised_returns.pkl
+[LocalFSArtifactStore] normalised_returns loaded, type: DataFrame
+[LocalFSArtifactStore] exists(positions): True
+[LocalFSArtifactStore] loading positions from artifacts\finance_run_001\positions.pkl
+[LocalFSArtifactStore] positions loaded, type: DataFrame
+[LocalFSArtifactStore] exists(total_position): True
+[LocalFSArtifactStore] loading total_position from artifacts\finance_run_001\total_position.pkl
+[LocalFSArtifactStore] total_position loaded, type: Series
+[LocalFSArtifactStore] exists(positions_plot): True
+[LocalFSArtifactStore] loading positions_plot from artifacts\finance_run_001\positions_plot.pkl
+[LocalFSArtifactStore] positions_plot loaded, type: Axes
+[LocalFSArtifactStore] exists(cumulative_return): True
+[LocalFSArtifactStore] loading cumulative_return from artifacts\finance_run_001\cumulative_return.pkl
+[LocalFSArtifactStore] cumulative_return loaded, type: float64
+[LocalFSArtifactStore] exists(daily_return): True
+[LocalFSArtifactStore] loading daily_return from artifacts\finance_run_001\daily_return.pkl
+[LocalFSArtifactStore] daily_return loaded, type: Series
+[LocalFSArtifactStore] exists(sharpe_ratio): True
+[LocalFSArtifactStore] loading sharpe_ratio from artifacts\finance_run_001\sharpe_ratio.pkl
+[LocalFSArtifactStore] sharpe_ratio loaded, type: float64
+[LocalFSArtifactStore] exists(annual_sharpe_ratio): True
+[LocalFSArtifactStore] loading annual_sharpe_ratio from artifacts\finance_run_001\annual_sharpe_ratio.pkl
+[LocalFSArtifactStore] annual_sharpe_ratio loaded, type: float64
+[LocalFSArtifactStore] exists(share_allocations): True
+[LocalFSArtifactStore] loading share_allocations from artifacts\finance_run_001\share_allocations.pkl
+[LocalFSArtifactStore] share_allocations loaded, type: dict
+[LocalFSArtifactStore] exists(initial_total_position): True
+[LocalFSArtifactStore] loading initial_total_position from artifacts\finance_run_001\initial_total_position.pkl
+[LocalFSArtifactStore] initial_total_position loaded, type: int
+[LocalFSArtifactStore] exists(start_date): True
+[LocalFSArtifactStore] loading start_date from artifacts\finance_run_001\start_date.pkl
+[LocalFSArtifactStore] start_date loaded, type: str
+[LocalFSArtifactStore] exists(end_date): True
+[LocalFSArtifactStore] loading end_date from artifacts\finance_run_001\end_date.pkl
+[LocalFSArtifactStore] end_date loaded, type: date
+
+============================================================
+=== Pipeline Results ===
+[closing_prices] DataFrame
+[normalised_returns] DataFrame
+[positions] DataFrame
+[total_position] Series
+[positions_plot] figure saved to positions_plot.png
+[cumulative_return] 544.895541628974
+[daily_return] Series
+[sharpe_ratio] 0.05953408085880958
+[annual_sharpe_ratio] 0.9450742349113248
+[share_allocations] dict
+[initial_total_position] 100000000
+
+[start_date]
+2017-01-01
+[end_date] date
+
+[run_pipeline] log saved to: C:\Users\GuptaGanesh\Desktop\new\fn_graph\fn_graph\examples\solution\logs\finance\finance_run_001\2026-04-06_17-55-12.log

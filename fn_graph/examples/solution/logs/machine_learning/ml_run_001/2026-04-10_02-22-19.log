@@ -1,0 +1,171 @@
+[run_pipeline] logging to: C:\Users\GuptaGanesh\Desktop\new\fn_graph\fn_graph\examples\solution\logs\machine_learning\ml_run_001\2026-04-10_02-22-19.log
+[config] creating artifact store: fs
+[run_pipeline] artifact store: LocalFSArtifactStore
+[run_pipeline] executors configured:
+  model_type: memory
+  do_preprocess: memory
+  iris: memory
+  data: memory
+  preprocess_data: memory
+  investigate_data: memory
+  split_data: memory
+  training_features: memory
+  training_target: memory
+  test_features: memory
+  test_target: memory
+  model: docker
+  predictions: memory
+  classification_metrics: memory
+  confusion_matrix: memory
+[run_pipeline] leaf outputs: ['investigate_data', 'classification_metrics', 'confusion_matrix']
+
+[PipelineComposer] pipeline run started
+[PipelineComposer] subclass of fn_graph Composer confirmed
+[PipelineComposer] outputs requested: ['investigate_data', 'classification_metrics', 'confusion_matrix']
+[PipelineComposer] execution order: ['model_type', 'do_preprocess', 'iris', 'data', 'preprocess_data', 'investigate_data', 'split_data', 'training_features', 'training_target', 'test_features', 'test_target', 'model', 'predictions', 'classification_metrics', 'confusion_matrix']
+[PipelineComposer] parameters: ['model_type', 'do_preprocess']
+
+[PipelineComposer] seeding parameters into artifact store
+[LocalFSArtifactStore] writing model_type to artifacts\ml_run_001\model_type.pkl
+[LocalFSArtifactStore] model_type written, size: 18 bytes
+[PipelineComposer] seeded: model_type = ols
+[LocalFSArtifactStore] writing do_preprocess to artifacts\ml_run_001\do_preprocess.pkl
+[LocalFSArtifactStore] do_preprocess written, size: 4 bytes
+[PipelineComposer] seeded: do_preprocess = True
+[config] stages defined: ['preprocessing', 'splitting', 'training', 'evaluation']
+[config]   stage 'preprocessing': executor=memory, nodes=['iris', 'data', 'preprocess_data', 'investigate_data']
+[config]   stage 'splitting': executor=memory, nodes=['split_data', 'training_features', 'training_target', 'test_features', 'test_target']
+[config]   stage 'training': executor=docker, nodes=['model']
+[config]   stage 'evaluation': executor=memory, nodes=['predictions', 'classification_metrics', 'confusion_matrix']
+
+[PipelineComposer] === Stage Boundary Analysis ===
+[PipelineComposer] stage 'preprocessing':
+  inputs   (load from store): []
+  outputs  (save to store):   ['preprocess_data']
+  internal (memory only):     ['data', 'investigate_data', 'iris']
+[PipelineComposer] stage 'splitting':
+  inputs   (load from store): ['preprocess_data']
+  outputs  (save to store):   ['test_features', 'test_target', 'training_features', 'training_target']
+  internal (memory only):     ['split_data']
+[PipelineComposer] stage 'training':
+  inputs   (load from store): ['training_features', 'training_target']
+  outputs  (save to store):   ['model']
+  internal (memory only):     []
+[PipelineComposer] stage 'evaluation':
+  inputs   (load from store): ['model', 'test_features', 'test_target']
+  outputs  (save to store):   []
+  internal (memory only):     ['classification_metrics', 'confusion_matrix', 'predictions']
+
+[PipelineComposer] stage-level DAG edges: [('preprocessing', 'splitting'), ('splitting', 'training'), ('splitting', 'evaluation'), ('training', 'evaluation')]
+[PipelineComposer] stage execution order (serial fallback): ['preprocessing', 'splitting', 'training', 'evaluation']
+
+[PipelineComposer] initial ready stages: ['preprocessing']
+
+[PipelineComposer] === dispatching stage: 'preprocessing' ===
+[PipelineComposer] dispatching 1 stage(s) in parallel: ['preprocessing']
+[LocalFSArtifactStore] exists(preprocess_data): True
+[PipelineComposer] stage 'preprocessing' fully memoized — skipping
+[PipelineComposer] stage 'preprocessing' finished, checking downstream stages
+[PipelineComposer] stage 'splitting' unblocked — dispatching
+
+[PipelineComposer] === dispatching stage: 'splitting' ===
+[LocalFSArtifactStore] exists(test_features): True
+[LocalFSArtifactStore] exists(training_features): True
+[LocalFSArtifactStore] exists(test_target): True
+[LocalFSArtifactStore] exists(training_target): True
+[PipelineComposer] stage 'splitting' fully memoized — skipping
+[PipelineComposer] stage 'splitting' finished, checking downstream stages
+[PipelineComposer] stage 'training' unblocked — dispatching
+
+[PipelineComposer] === dispatching stage: 'training' ===
+[LocalFSArtifactStore] exists(model): True
+[PipelineComposer] stage 'training' fully memoized — skipping
+[PipelineComposer] stage 'training' finished, checking downstream stages
+[PipelineComposer] stage 'evaluation' unblocked — dispatching
+
+[PipelineComposer] === dispatching stage: 'evaluation' ===
+[LocalFSArtifactStore] exists(predictions): True
+[LocalFSArtifactStore] exists(classification_metrics): True
+[LocalFSArtifactStore] exists(confusion_matrix): True
+[PipelineComposer] stage 'evaluation' fully memoized (terminal) — skipping
+[PipelineComposer] stage 'evaluation' finished, checking downstream stages
+
+[PipelineComposer] all stages complete
+[LocalFSArtifactStore] exists(model_type): True
+[LocalFSArtifactStore] loading model_type from artifacts\ml_run_001\model_type.pkl
+[LocalFSArtifactStore] model_type loaded, type: str
+[LocalFSArtifactStore] exists(do_preprocess): True
+[LocalFSArtifactStore] loading do_preprocess from artifacts\ml_run_001\do_preprocess.pkl
+[LocalFSArtifactStore] do_preprocess loaded, type: bool
+[LocalFSArtifactStore] exists(iris): True
+[LocalFSArtifactStore] loading iris from artifacts\ml_run_001\iris.pkl
+[LocalFSArtifactStore] iris loaded, type: Bunch
+[LocalFSArtifactStore] exists(data): True
+[LocalFSArtifactStore] loading data from artifacts\ml_run_001\data.pkl
+[LocalFSArtifactStore] data loaded, type: DataFrame
+[LocalFSArtifactStore] exists(preprocess_data): True
+[LocalFSArtifactStore] loading preprocess_data from artifacts\ml_run_001\preprocess_data.pkl
+[LocalFSArtifactStore] preprocess_data loaded, type: DataFrame
+[LocalFSArtifactStore] exists(investigate_data): True
+[LocalFSArtifactStore] loading investigate_data from artifacts\ml_run_001\investigate_data.pkl
+[LocalFSArtifactStore] investigate_data loaded, type: PairGrid
+[LocalFSArtifactStore] exists(split_data): True
+[LocalFSArtifactStore] loading split_data from artifacts\ml_run_001\split_data.pkl
+[LocalFSArtifactStore] split_data loaded, type: dict
+[LocalFSArtifactStore] exists(training_features): True
+[LocalFSArtifactStore] loading training_features from artifacts\ml_run_001\training_features.pkl
+[LocalFSArtifactStore] training_features loaded, type: DataFrame
+[LocalFSArtifactStore] exists(training_target): True
+[LocalFSArtifactStore] loading training_target from artifacts\ml_run_001\training_target.pkl
+[LocalFSArtifactStore] training_target loaded, type: Series
+[LocalFSArtifactStore] exists(test_features): True
+[LocalFSArtifactStore] loading test_features from artifacts\ml_run_001\test_features.pkl
+[LocalFSArtifactStore] test_features loaded, type: DataFrame
+[LocalFSArtifactStore] exists(test_target): True
+[LocalFSArtifactStore] loading test_target from artifacts\ml_run_001\test_target.pkl
+[LocalFSArtifactStore] test_target loaded, type: Series
+[LocalFSArtifactStore] exists(model): True
+[LocalFSArtifactStore] loading model from artifacts\ml_run_001\model.pkl
+[LocalFSArtifactStore] model loaded, type: LogisticRegression
+[LocalFSArtifactStore] exists(predictions): True
+[LocalFSArtifactStore] loading predictions from artifacts\ml_run_001\predictions.pkl
+[LocalFSArtifactStore] predictions loaded, type: ndarray
+[LocalFSArtifactStore] exists(classification_metrics): True
+[LocalFSArtifactStore] loading classification_metrics from artifacts\ml_run_001\classification_metrics.pkl
+[LocalFSArtifactStore] classification_metrics loaded, type: str
+[LocalFSArtifactStore] exists(confusion_matrix): True
+[LocalFSArtifactStore] loading confusion_matrix from artifacts\ml_run_001\confusion_matrix.pkl
+[LocalFSArtifactStore] confusion_matrix loaded, type: Figure
+
+============================================================
+=== Pipeline Results ===
+
+[model_type]
+ols
+[do_preprocess] True
+[iris] Bunch
+[data] DataFrame
+[preprocess_data] DataFrame
+[investigate_data] PairGrid
+[split_data] dict
+[training_features] DataFrame
+[training_target] Series
+[test_features] DataFrame
+[test_target] Series
+[model] LogisticRegression
+[predictions] ndarray
+
+[classification_metrics]
+              precision    recall  f1-score   support
+
+           0       1.00      1.00      1.00         8
+           1       1.00      0.92      0.96        13
+           2       0.94      1.00      0.97        17
+
+    accuracy                           0.97        38
+   macro avg       0.98      0.97      0.98        38
+weighted avg       0.98      0.97      0.97        38
+
+[confusion_matrix] figure saved to confusion_matrix.png
+
+[run_pipeline] log saved to: C:\Users\GuptaGanesh\Desktop\new\fn_graph\fn_graph\examples\solution\logs\machine_learning\ml_run_001\2026-04-10_02-22-19.log
