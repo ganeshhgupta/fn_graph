@@ -1,12 +1,26 @@
 pipeline:
-  run_id: ml_run_001
+  run_id: ml_run_local_001
   on_failure: finish_running
 
 artifact_store:
   type: fs
   base_dir: ./artifacts
 
+stages:
+  preprocessing:
+    executor: memory
+    nodes: [iris, data, preprocess_data, investigate_data]
+  splitting:
+    executor: memory
+    nodes: [split_data, training_features, training_target, test_features, test_target]
+  training:
+    executor: memory
+    nodes: [model]
+  evaluation:
+    executor: memory
+    nodes: [predictions, classification_metrics, confusion_matrix]
+
+# Keep node-level config as fallback for non-stage runs
 nodes:
-  # all nodes run in-process (no Docker)
   "*":
     executor: memory
