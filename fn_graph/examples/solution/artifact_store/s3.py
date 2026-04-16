@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 import boto3
@@ -5,6 +6,8 @@ import cloudpickle
 from botocore.exceptions import ClientError
 
 from .base import BaseArtifactStore
+
+log = logging.getLogger(__name__)
 
 
 class S3ArtifactStore(BaseArtifactStore):
@@ -19,17 +22,17 @@ class S3ArtifactStore(BaseArtifactStore):
 
     def put(self, key: str, value: Any) -> None:
         s3_key = self._key(key)
-        print(f"[S3ArtifactStore] uploading {key} to s3://{self.bucket}/{s3_key}", flush=True)
+        log.debug(f"[S3ArtifactStore] uploading {key} to s3://{self.bucket}/{s3_key}")
         data = cloudpickle.dumps(value, protocol=4)
         self._client.put_object(Bucket=self.bucket, Key=s3_key, Body=data)
-        print(f"[S3ArtifactStore] {key} uploaded, size: {len(data)} bytes", flush=True)
+        log.debug(f"[S3ArtifactStore] {key} uploaded, size: {len(data)} bytes")
 
     def get(self, key: str) -> Any:
         s3_key = self._key(key)
-        print(f"[S3ArtifactStore] downloading {key} from s3://{self.bucket}/{s3_key}", flush=True)
+        log.debug(f"[S3ArtifactStore] downloading {key} from s3://{self.bucket}/{s3_key}")
         response = self._client.get_object(Bucket=self.bucket, Key=s3_key)
         result = cloudpickle.loads(response["Body"].read())
-        print(f"[S3ArtifactStore] {key} downloaded, type: {type(result).__name__}", flush=True)
+        log.debug(f"[S3ArtifactStore] {key} downloaded, type: {type(result).__name__}")
         return result
 
     def exists(self, key: str) -> bool:
@@ -41,7 +44,7 @@ class S3ArtifactStore(BaseArtifactStore):
                 result = False
             else:
                 raise
-        print(f"[S3ArtifactStore] exists({key}): {result}", flush=True)
+        log.debug(f"[S3ArtifactStore] exists({key}): {result}")
         return result
 
     def delete(self, key: str) -> None:

@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -5,6 +6,8 @@ from typing import Any
 import cloudpickle
 
 from .base import BaseArtifactStore
+
+log = logging.getLogger(__name__)
 
 
 class LocalFSArtifactStore(BaseArtifactStore):
@@ -19,23 +22,23 @@ class LocalFSArtifactStore(BaseArtifactStore):
 
     def put(self, key: str, value: Any) -> None:
         path = self._path(key)
-        print(f"[LocalFSArtifactStore] writing {key} to {path}", flush=True)
+        log.debug(f"[LocalFSArtifactStore] writing {key} to {path}")
         tmp_path = path.with_suffix(".tmp")
         data = cloudpickle.dumps(value, protocol=4)
         tmp_path.write_bytes(data)
         os.replace(tmp_path, path)
-        print(f"[LocalFSArtifactStore] {key} written, size: {len(data)} bytes", flush=True)
+        log.debug(f"[LocalFSArtifactStore] {key} written, size: {len(data)} bytes")
 
     def get(self, key: str) -> Any:
         path = self._path(key)
-        print(f"[LocalFSArtifactStore] loading {key} from {path}", flush=True)
+        log.debug(f"[LocalFSArtifactStore] loading {key} from {path}")
         result = cloudpickle.loads(path.read_bytes())
-        print(f"[LocalFSArtifactStore] {key} loaded, type: {type(result).__name__}", flush=True)
+        log.debug(f"[LocalFSArtifactStore] {key} loaded, type: {type(result).__name__}")
         return result
 
     def exists(self, key: str) -> bool:
         result = self._path(key).exists()
-        print(f"[LocalFSArtifactStore] exists({key}): {result}", flush=True)
+        log.debug(f"[LocalFSArtifactStore] exists({key}): {result}")
         return result
 
     def delete(self, key: str) -> None:

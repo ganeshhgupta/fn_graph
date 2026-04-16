@@ -8,17 +8,20 @@ boot cost, then destroys it. PersistentDockerExecutor skips all of that and just
 POSTs to the already-running container's /execute endpoint.
 
 Worker contract (worker/server.py):
-    POST /execute   { node_name, fn_source, kwargs_b64 }  → { result_b64 }
-    GET  /health    → { status: "ok" }
+    POST /execute   { node_name, fn_source, kwargs_b64 }  -> { result_b64 }
+    GET  /health    -> { status: "ok" }
 """
 
 import base64
+import logging
 from typing import Any, Callable
 
 import cloudpickle
 import requests
 
 from .base import BaseExecutor, gather_fn_source
+
+log = logging.getLogger(__name__)
 
 
 class PersistentDockerExecutor(BaseExecutor):
@@ -40,11 +43,8 @@ class PersistentDockerExecutor(BaseExecutor):
         self.timeout = timeout
 
     def execute(self, node_name: str, fn: Callable, kwargs: dict) -> Any:
-        print(
-            f"[PersistentDockerExecutor] dispatching '{node_name}' -> {self.url}",
-            flush=True,
-        )
-        print(f"[PersistentDockerExecutor] inputs: {list(kwargs.keys())}", flush=True)
+        log.info(f"[PersistentDockerExecutor] dispatching '{node_name}' -> {self.url}")
+        log.debug(f"[PersistentDockerExecutor] inputs: {list(kwargs.keys())}")
 
         fn_source = gather_fn_source(fn)
         kwargs_b64 = base64.b64encode(cloudpickle.dumps(kwargs, protocol=4)).decode()
@@ -61,14 +61,8 @@ class PersistentDockerExecutor(BaseExecutor):
 
         if resp.status_code == 500:
             payload = resp.json()
-            print(
-                f"[PersistentDockerExecutor] ERROR in node '{node_name}': {payload.get('error')}",
-                flush=True,
-            )
-            print(
-                f"[PersistentDockerExecutor] traceback:\n{payload.get('traceback', '')}",
-                flush=True,
-            )
+            log.error(f"[PersistentDockerExecutor] ERROR in node '{node_name}': {payload.get('error')}")
+            log.error(f"[PersistentDockerExecutor] traceback:\n{payload.get('traceback', '')}")
             raise RuntimeError(
                 f"Worker error in node '{node_name}': {payload.get('error')}"
             )
@@ -76,9 +70,8 @@ class PersistentDockerExecutor(BaseExecutor):
         resp.raise_for_status()
         payload = resp.json()
         result = cloudpickle.loads(base64.b64decode(payload["result_b64"]))
-        print(
+        log.info(
             f"[PersistentDockerExecutor] '{node_name}' complete, "
-            f"output type: {type(result).__name__}",
-            flush=True,
+            f"output type: {type(result).__name__}"
         )
         return result

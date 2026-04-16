@@ -1,4 +1,5 @@
 import base64
+import logging
 import socket
 import subprocess
 import time
@@ -8,6 +9,8 @@ import cloudpickle
 import requests
 
 from .base import BaseExecutor, gather_fn_source
+
+log = logging.getLogger(__name__)
 
 _HEALTH_TIMEOUT = 30
 _HEALTH_INTERVAL = 0.5
@@ -25,11 +28,11 @@ class DockerExecutor(BaseExecutor):
         self.image = image
 
     def execute(self, node_name: str, fn: Callable, kwargs: dict) -> Any:
-        print(f"[DockerExecutor] starting container for node: {node_name}", flush=True)
-        print(f"[DockerExecutor] image: {self.image}", flush=True)
+        log.info(f"[DockerExecutor] starting container for node: {node_name}")
+        log.debug(f"[DockerExecutor] image: {self.image}")
 
         port = _free_port()
-        print(f"[DockerExecutor] assigned port: {port}", flush=True)
+        log.debug(f"[DockerExecutor] assigned port: {port}")
 
         container_id = None
         try:
@@ -40,7 +43,7 @@ class DockerExecutor(BaseExecutor):
                 check=True,
             )
             container_id = result.stdout.strip()
-            print(f"[DockerExecutor] container id: {container_id}", flush=True)
+            log.debug(f"[DockerExecutor] container id: {container_id}")
 
             # Poll /health until ready
             deadline = time.time() + _HEALTH_TIMEOUT
@@ -57,24 +60,24 @@ class DockerExecutor(BaseExecutor):
                     )
                 time.sleep(_HEALTH_INTERVAL)
 
-            print(f"[DockerExecutor] container healthy, sending work", flush=True)
+            log.info(f"[DockerExecutor] container healthy, sending work")
 
             fn_source = gather_fn_source(fn)
             kwargs_b64 = base64.b64encode(cloudpickle.dumps(kwargs, protocol=4)).decode()
 
-            print(f"[DockerExecutor] posting to /execute, inputs: {list(kwargs.keys())}", flush=True)
+            log.debug(f"[DockerExecutor] posting to /execute, inputs: {list(kwargs.keys())}")
 
             resp = requests.post(
                 f"http://localhost:{port}/execute",
                 json={"node_name": node_name, "fn_source": fn_source, "kwargs_b64": kwargs_b64},
                 timeout=300,
             )
-            print(f"[DockerExecutor] response received, status: {resp.status_code}", flush=True)
+            log.debug(f"[DockerExecutor] response received, status: {resp.status_code}")
 
             if resp.status_code == 500:
                 payload = resp.json()
-                print(f"[DockerExecutor] ERROR in node '{node_name}': {payload.get('error')}", flush=True)
-                print(f"[DockerExecutor] traceback:\n{payload.get('traceback', '')}", flush=True)
+                log.error(f"[DockerExecutor] ERROR in node '{node_name}': {payload.get('error')}")
+                log.error(f"[DockerExecutor] traceback:\n{payload.get('traceback', '')}")
                 raise RuntimeError(
                     f"Worker error in node '{node_name}': {payload.get('error')}"
                 )
@@ -82,10 +85,10 @@ class DockerExecutor(BaseExecutor):
             resp.raise_for_status()
             payload = resp.json()
             result = cloudpickle.loads(base64.b64decode(payload["result_b64"]))
-            print(f"[DockerExecutor] node {node_name} complete, output type: {type(result).__name__}", flush=True)
+            log.info(f"[DockerExecutor] node {node_name} complete, output type: {type(result).__name__}")
             return result
         finally:
             if container_id:
                 subprocess.run(["docker", "stop", container_id], capture_output=True)
                 subprocess.run(["docker", "rm", container_id], capture_output=True)
-                print(f"[DockerExecutor] container stopped and removed", flush=True)
+                log.debug(f"[DockerExecutor] container stopped and removed")
