@@ -13,13 +13,12 @@ Worker contract (worker/server.py):
 """
 
 import base64
-import inspect
 from typing import Any, Callable
 
 import cloudpickle
 import requests
 
-from .base import BaseExecutor
+from .base import BaseExecutor, gather_fn_source
 
 
 class PersistentDockerExecutor(BaseExecutor):
@@ -42,12 +41,12 @@ class PersistentDockerExecutor(BaseExecutor):
 
     def execute(self, node_name: str, fn: Callable, kwargs: dict) -> Any:
         print(
-            f"[PersistentDockerExecutor] dispatching '{node_name}' → {self.url}",
+            f"[PersistentDockerExecutor] dispatching '{node_name}' -> {self.url}",
             flush=True,
         )
         print(f"[PersistentDockerExecutor] inputs: {list(kwargs.keys())}", flush=True)
 
-        fn_source = inspect.getsource(fn)
+        fn_source = gather_fn_source(fn)
         kwargs_b64 = base64.b64encode(cloudpickle.dumps(kwargs, protocol=4)).decode()
 
         resp = requests.post(

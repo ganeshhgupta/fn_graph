@@ -1,5 +1,4 @@
 import base64
-import inspect
 import socket
 import subprocess
 import time
@@ -8,7 +7,7 @@ from typing import Any, Callable
 import cloudpickle
 import requests
 
-from .base import BaseExecutor
+from .base import BaseExecutor, gather_fn_source
 
 _HEALTH_TIMEOUT = 30
 _HEALTH_INTERVAL = 0.5
@@ -60,7 +59,7 @@ class DockerExecutor(BaseExecutor):
 
             print(f"[DockerExecutor] container healthy, sending work", flush=True)
 
-            fn_source = inspect.getsource(fn)
+            fn_source = gather_fn_source(fn)
             kwargs_b64 = base64.b64encode(cloudpickle.dumps(kwargs, protocol=4)).decode()
 
             print(f"[DockerExecutor] posting to /execute, inputs: {list(kwargs.keys())}", flush=True)
