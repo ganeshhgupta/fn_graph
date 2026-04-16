@@ -5,6 +5,7 @@ import yaml
 from executor.memory import InMemoryExecutor
 from executor.docker import DockerExecutor
 from executor.lambda_executor import LambdaExecutor
+from executor.persistent_docker import PersistentDockerExecutor
 from artifact_store.fs import LocalFSArtifactStore
 from artifact_store.s3 import S3ArtifactStore
 
@@ -33,6 +34,11 @@ def get_executor(node_config: dict):
         return LambdaExecutor(
             function_name=node_config["function_name"],
             region=node_config["region"],
+        )
+    elif executor_type == "persistent_docker":
+        return PersistentDockerExecutor(
+            url=node_config["url"],
+            timeout=node_config.get("timeout", 300),
         )
     else:
         raise ValueError(f"Unknown executor type: '{executor_type}'")

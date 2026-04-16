@@ -1,0 +1,35 @@
+version: "3.9"
+
+# Pre-hosted persistent worker containers for fn_graph pipelines.
+#
+# Usage:
+#   docker compose up -d          # start containers (one-time, stays running)
+#   python run_pipeline.py \
+#       --pipeline fn_graph.examples.machine_learning \
+#       --config machine_learning_persistent.yaml
+#   docker compose down           # stop when done
+#
+# The worker containers are stateless — they execute any function sent via
+# POST /execute and never hold pipeline state between calls. You can restart
+# them or scale them without touching the pipeline definition.
+#
+# To route different stages to different containers, add more services below
+# and update the `url:` field per stage in machine_learning_persistent.yaml.
+
+services:
+
+  # Single shared worker — handles all stages of the ML pipeline.
+  # Maps container port 8000 → host port 8001.
+  worker:
+    image: fn_graph_worker_v2
+    ports:
+      - "8001:8000"
+    restart: unless-stopped
+
+  # Uncomment to add a second worker for parallelism or stage isolation.
+  # Update the relevant stage url to http://localhost:8002.
+  # worker2:
+  #   image: fn_graph_worker_v2
+  #   ports:
+  #     - "8002:8000"
+  #   restart: unless-stopped

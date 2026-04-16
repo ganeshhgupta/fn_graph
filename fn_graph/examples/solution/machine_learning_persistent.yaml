@@ -1,0 +1,43 @@
+pipeline:
+  run_id: ml_run_persistent_001
+  on_failure: finish_running
+
+artifact_store:
+  type: fs
+  base_dir: ./artifacts
+
+# All stages dispatch to pre-hosted, long-running worker containers.
+# Start them before running the pipeline:
+#   docker compose up -d
+#
+# Each stage can point to the same container (shared) or different containers
+# (isolation / parallelism). Here all stages share a single worker at port 8001.
+# To use separate containers per stage, change the url per stage and add
+# corresponding services to docker-compose.yml.
+
+stages:
+  preprocessing:
+    executor: persistent_docker
+    url: http://localhost:8001
+    nodes: [iris, data, preprocess_data, investigate_data]
+
+  splitting:
+    executor: persistent_docker
+    url: http://localhost:8001
+    nodes: [split_data, training_features, training_target, test_features, test_target]
+
+  training:
+    executor: persistent_docker
+    url: http://localhost:8001
+    nodes: [model]
+
+  evaluation:
+    executor: persistent_docker
+    url: http://localhost:8001
+    nodes: [predictions, classification_metrics, confusion_matrix]
+
+# Fallback for non-stage runs — all nodes use the shared persistent worker
+nodes:
+  "*":
+    executor: persistent_docker
+    url: http://localhost:8001
