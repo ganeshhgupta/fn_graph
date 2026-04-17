@@ -5,10 +5,8 @@ import yaml
 
 from executor.memory import InMemoryExecutor
 from executor.docker import DockerExecutor
-from executor.lambda_executor import LambdaExecutor
 from executor.persistent_docker import PersistentDockerExecutor
 from artifact_store.fs import LocalFSArtifactStore
-from artifact_store.s3 import S3ArtifactStore
 
 log = logging.getLogger(__name__)
 
@@ -34,6 +32,7 @@ def get_executor(node_config: dict):
     elif executor_type == "docker":
         return DockerExecutor(image=node_config.get("image", "fn_graph_worker_v2"))
     elif executor_type == "lambda":
+        from executor.lambda_executor import LambdaExecutor
         return LambdaExecutor(
             function_name=node_config["function_name"],
             region=node_config["region"],
@@ -55,6 +54,7 @@ def get_artifact_store(config: dict):
     if store_type == "fs":
         return LocalFSArtifactStore(base_dir=store_cfg["base_dir"], run_id=run_id)
     elif store_type == "s3":
+        from artifact_store.s3 import S3ArtifactStore
         return S3ArtifactStore(
             bucket=store_cfg["bucket"],
             run_id=run_id,

@@ -7,8 +7,11 @@ Contrast with DockerExecutor, which spins up a fresh container per node, pays th
 boot cost, then destroys it. PersistentDockerExecutor skips all of that and just
 POSTs to the already-running container's /execute endpoint.
 
+The pipeline module must be pre-installed inside the worker image. The executor sends
+only the module path and node name — no source code over the wire, no exec().
+
 Worker contract (worker/server.py):
-    POST /execute   { node_name, fn_source, kwargs_b64 }  -> { result_b64 }
+    POST /execute   { node_name, module, kwargs_b64 }  -> { result_b64 }
     GET  /health    -> { status: "ok" }
 """
 
@@ -19,7 +22,7 @@ from typing import Any, Callable
 import cloudpickle
 import requests
 
-from .base import BaseExecutor, gather_fn_source
+from .base import BaseExecutor
 
 log = logging.getLogger(__name__)
 
@@ -28,9 +31,9 @@ class PersistentDockerExecutor(BaseExecutor):
     """
     Executor that delegates node execution to a pre-running worker container.
 
-    The container is expected to already be up and healthy before the pipeline
-    starts. No container lifecycle management is performed here — start/stop is
-    handled externally via docker compose (or any other means).
+    The container must have the pipeline module pre-installed. Functions are
+    resolved inside the container by module import — no source code is shipped
+    over HTTP.
 
     Args:
         url: Base URL of the worker container, e.g. "http://localhost:8001".
@@ -46,14 +49,14 @@ class PersistentDockerExecutor(BaseExecutor):
         log.info(f"[PersistentDockerExecutor] dispatching '{node_name}' -> {self.url}")
         log.debug(f"[PersistentDockerExecutor] inputs: {list(kwargs.keys())}")
 
-        fn_source = gather_fn_source(fn)
+        module = fn.__module__
         kwargs_b64 = base64.b64encode(cloudpickle.dumps(kwargs, protocol=4)).decode()
 
         resp = requests.post(
             f"{self.url}/execute",
             json={
                 "node_name": node_name,
-                "fn_source": fn_source,
+                "module": module,
                 "kwargs_b64": kwargs_b64,
             },
             timeout=self.timeout,

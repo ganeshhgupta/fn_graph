@@ -1,0 +1,42 @@
+version: "3.9"
+
+# One dedicated persistent worker container per pipeline stage.
+# Each container has the fn_graph package pre-installed — functions are imported
+# by module name, no source code shipped over HTTP, no exec().
+#
+# Usage:
+#   docker compose -f docker-compose-multi.yml build
+#   docker compose -f docker-compose-multi.yml up -d
+#   python run_pipeline.py \
+#       --pipeline fn_graph.examples.machine_learning \
+#       --config machine_learning_multi_persistent.yaml
+#   docker compose -f docker-compose-multi.yml down
+
+x-worker: &worker
+  build:
+    context: ../../..
+    dockerfile: fn_graph/examples/solution/worker/Dockerfile
+  image: fn_graph_worker_v2
+  restart: unless-stopped
+
+services:
+
+  worker-preprocessing:
+    <<: *worker
+    ports:
+      - "8001:8000"
+
+  worker-splitting:
+    <<: *worker
+    ports:
+      - "8002:8000"
+
+  worker-training:
+    <<: *worker
+    ports:
+      - "8003:8000"
+
+  worker-evaluation:
+    <<: *worker
+    ports:
+      - "8004:8000"

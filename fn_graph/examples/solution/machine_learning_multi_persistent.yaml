@@ -1,0 +1,40 @@
+pipeline:
+  run_id: ml_run_multi_persistent_001
+  on_failure: finish_running
+
+artifact_store:
+  type: fs
+  base_dir: ./artifacts
+
+# Each stage is isolated in its own dedicated persistent Docker container.
+# All fn_graph access is exclusively through HTTP API calls — no in-process execution.
+#
+# Start containers before running:
+#   docker compose -f docker-compose-multi.yml up -d
+#
+# Container layout:
+#   worker-preprocessing  -> localhost:8001
+#   worker-splitting      -> localhost:8002
+#   worker-training       -> localhost:8003
+#   worker-evaluation     -> localhost:8004
+
+stages:
+  preprocessing:
+    executor: persistent_docker
+    url: http://localhost:8001
+    nodes: [iris, data, preprocess_data, investigate_data]
+
+  splitting:
+    executor: persistent_docker
+    url: http://localhost:8002
+    nodes: [split_data, training_features, training_target, test_features, test_target]
+
+  training:
+    executor: persistent_docker
+    url: http://localhost:8003
+    nodes: [model]
+
+  evaluation:
+    executor: persistent_docker
+    url: http://localhost:8004
+    nodes: [predictions, classification_metrics, confusion_matrix]
