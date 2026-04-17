@@ -169,6 +169,24 @@ If a pipeline crashes at node 7 of 12, the next run with the same `run_id` picks
 
 ---
 
+## What gets written to the store (stage-based execution)
+
+With stage partitioning, not every node writes to the store. Only two categories are persisted:
+
+```mermaid
+flowchart TD
+    A[node result computed] --> B{category?}
+    B -->|boundary output\nsuccessor in different stage| C[artifact_store.put]
+    B -->|leaf output\nout-degree 0 in DAG| C
+    B -->|internal node\nboth predecessor and successor\nin the same stage| D[stays in memory\nnever serialized]
+```
+
+For a chain A → B → C within one stage where only C is consumed by the next stage: A and B produce zero pkl files. Only C is written to disk.
+
+Pass `--debug-artifacts` to override this and persist every node — useful for inspecting intermediate results without modifying the pipeline or YAML.
+
+---
+
 ## Switching backends
 
 ```mermaid

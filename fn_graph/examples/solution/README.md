@@ -176,6 +176,16 @@ docker compose -f docker-compose-multi.yml down
 set PYTHONPATH=C:\Users\GuptaGanesh\Desktop\New folder\fn_graph && python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config machine_learning_multi_persistent.yaml --debug
 ```
 
+### Inspect all intermediate results (`--debug-artifacts`)
+
+By default, only boundary output nodes and leaf output nodes are written to the artifact store. Pass `--debug-artifacts` to persist every node, including intra-stage intermediates — useful for debugging without changing the pipeline or config:
+
+```cmd
+set PYTHONPATH=C:\Users\GuptaGanesh\Desktop\New folder\fn_graph && python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config machine_learning_local.yaml --debug-artifacts
+```
+
+After the run, every node's output will have a corresponding `.pkl` file under `artifacts/{run_id}/`.
+
 ---
 
 ## Executor Types
@@ -203,9 +213,12 @@ POST /execute              → { result_b64 }
 
 ### What it does
 
-Stage partitioning groups pipeline nodes into named stages. Within a stage, all node results pass directly in memory — no serialization to disk between steps. Only nodes at stage *boundaries* (where one stage hands off to another) are persisted to the artifact store.
+Stage partitioning groups pipeline nodes into named stages. Within a stage, all node results pass directly in memory — no serialization to disk between steps. Exactly two categories of nodes are persisted to the artifact store:
 
-This reduces unnecessary I/O: in a 10-node pipeline where 8 nodes pass results internally and only 2 cross stage lines, you write 2 artifacts instead of 10.
+1. **Boundary output nodes** — consumed by a downstream stage (cross-stage handoff)
+2. **Leaf output nodes** — the pipeline's final requested outputs (nodes with out-degree 0)
+
+Everything else stays in memory and is never serialized to disk. This reduces unnecessary I/O: in a 10-node pipeline where 8 nodes pass results internally and only 2 cross stage lines, you write 2 artifacts instead of 10.
 
 ### Why it matters
 

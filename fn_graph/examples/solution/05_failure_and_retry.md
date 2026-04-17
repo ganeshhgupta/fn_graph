@@ -104,7 +104,7 @@ When to use each:
 
 Because of memoization and run IDs, resume is free. No special logic.
 
-With **stage-based execution**, resume is coarser but faster — an entire stage is skipped if all its boundary output nodes already exist in the artifact store. A single failed node in a stage means the whole stage re-runs on resume (only boundary nodes are persisted, so intra-stage progress is not saved).
+With **stage-based execution**, resume is coarser but faster — an entire stage is skipped if all its boundary output nodes already exist in the artifact store. A single failed node in a stage means the whole stage re-runs on resume (only boundary outputs and leaf outputs are persisted; intra-stage progress is not saved).
 
 ```mermaid
 flowchart TD

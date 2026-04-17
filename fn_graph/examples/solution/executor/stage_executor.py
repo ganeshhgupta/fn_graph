@@ -2,9 +2,16 @@
 StageExecutor: runs all nodes within a pipeline stage in topological order,
 keeping results in memory to avoid unnecessary serialization.
 
-Only nodes at stage boundaries (consumed by a different stage) are persisted
-to the artifact store. This dramatically reduces I/O overhead compared to
-saving every node output, especially for large intermediate tensors or DataFrames.
+Exactly two categories of nodes are written to the artifact store:
+  1. Boundary output nodes — consumed by a downstream stage (cross-stage handoff)
+  2. Leaf output nodes    — the pipeline's final requested outputs (terminal stage)
+
+Everything else stays in memory for the lifetime of the stage and is never
+serialized to disk. This means intra-stage intermediate results (A→B→C where
+only C crosses the boundary) produce zero pkl files.
+
+Pass debug_artifacts=True (via --debug-artifacts CLI flag) to persist all nodes
+for inspection without changing the pipeline or config.
 
 The caller (PipelineComposer._calculate_with_stages) is responsible for:
   - Loading stage inputs from the artifact store before calling run()
@@ -25,8 +32,15 @@ class StageExecutor:
     Executes all nodes in a single pipeline stage.
 
     Nodes run in topological order within the stage. Results pass between
-    nodes purely in-memory (a local dict). Only boundary output nodes are
-    written to the artifact store, since those results are needed by later stages.
+    nodes purely in-memory (a local dict). Only two categories of nodes are
+    written to the artifact store:
+      - boundary output nodes: consumed by a downstream stage
+      - leaf output nodes: the pipeline's final requested outputs (terminal stage)
+
+    All other intra-stage nodes stay in memory and are never serialized.
+
+    Pass debug_artifacts=True to persist every node regardless of category —
+    useful for inspecting intermediate results without changing the pipeline.
     """
 
     def __init__(
@@ -40,6 +54,8 @@ class StageExecutor:
         artifact_store,
         stage_output_nodes: set,
         ancestor_dag,
+        leaf_outputs: set = None,
+        debug_artifacts: bool = False,
     ):
         self.stage_name = stage_name
         self.stage_def = stage_def
@@ -49,6 +65,8 @@ class StageExecutor:
         self.artifact_store = artifact_store
         self.stage_output_nodes = stage_output_nodes
         self.ancestor_dag = ancestor_dag
+        self.leaf_outputs = leaf_outputs or set()
+        self.debug_artifacts = debug_artifacts
         self.executor = get_executor(stage_def)
 
     def run(self) -> dict:
@@ -101,20 +119,22 @@ class StageExecutor:
             result = self.executor.execute(node_name, self.node_functions[node_name], kwargs)
             self.memory[node_name] = result
 
-            if node_name in self.stage_output_nodes:
-                log.debug(f"[StageExecutor:{self.stage_name}] persisting boundary node '{node_name}' to store")
+            is_boundary = node_name in self.stage_output_nodes
+            is_leaf     = node_name in self.leaf_outputs
+
+            if self.debug_artifacts or is_boundary or is_leaf:
+                if self.debug_artifacts:
+                    reason = "debug-artifacts"
+                elif is_boundary:
+                    reason = "boundary output"
+                else:
+                    reason = "leaf output"
+                log.debug(f"[StageExecutor:{self.stage_name}] persisting '{node_name}' ({reason})")
                 self.artifact_store.put(node_name, result)
-                boundary_outputs[node_name] = result
+                if is_boundary:
+                    boundary_outputs[node_name] = result
             else:
                 log.debug(f"[StageExecutor:{self.stage_name}] '{node_name}' stays in memory (internal)")
-
-        for node_name in ordered_nodes:
-            if node_name not in self.stage_output_nodes and node_name in self.memory:
-                if not self.artifact_store.exists(node_name):
-                    log.debug(
-                        f"[StageExecutor:{self.stage_name}] persisting terminal/internal '{node_name}' for results"
-                    )
-                    self.artifact_store.put(node_name, self.memory[node_name])
 
         log.info(
             f"[StageExecutor:{self.stage_name}] stage complete, "

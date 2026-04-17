@@ -122,7 +122,7 @@ class PipelineComposer(Composer):
 
         if stages:
             return self._calculate_with_stages(
-                stages, ancestor_dag, topo_order, funcs, params
+                stages, ancestor_dag, topo_order, funcs, params, leaf_outputs=set(outputs)
             )
 
         # ── Node-level execution path (fallback) ──────────────────────────────
@@ -197,12 +197,15 @@ class PipelineComposer(Composer):
                 all_results[name] = self.artifact_store.get(name)
         return all_results
 
-    def _calculate_with_stages(self, stages, ancestor_dag, topo_order, funcs, params):
+    def _calculate_with_stages(self, stages, ancestor_dag, topo_order, funcs, params, leaf_outputs=None):
         """
         Stage-based execution: runs nodes within each stage in-memory, only persisting
         nodes at stage boundaries. Dispatches independent stages in parallel.
         """
         from executor.stage_executor import StageExecutor
+
+        leaf_outputs = leaf_outputs or set()
+        debug_artifacts = self._config.get("pipeline", {}).get("debug_artifacts", False)
 
         analysis = self._analyze_stage_boundaries(stages, ancestor_dag)
         stage_dag = analysis["__stage_dag__"]
@@ -255,6 +258,8 @@ class PipelineComposer(Composer):
                 artifact_store=self.artifact_store,
                 stage_output_nodes=stage_info["outputs"],
                 ancestor_dag=ancestor_dag,
+                leaf_outputs=leaf_outputs,
+                debug_artifacts=debug_artifacts,
             )
             executor.run()
             log.info(f"[PipelineComposer] stage '{stage_name}' complete")

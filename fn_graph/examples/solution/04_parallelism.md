@@ -202,4 +202,4 @@ gantt
 - The join condition is strict: all predecessors must be DONE, not just started.
 - Worker threads dispatch to executors. Each executor handles its own network call or subprocess independently.
 - Artifact store must handle concurrent writes safely. LocalFS uses atomic rename. S3 `put_object` is atomic by default.
-- Stage-level parallelism is coarser but reduces artifact store I/O — only boundary nodes are persisted, not every intermediate result.
+- Stage-level parallelism is coarser but reduces artifact store I/O — only boundary output nodes and leaf output nodes (final requested outputs) are persisted; all intra-stage intermediates stay in memory.

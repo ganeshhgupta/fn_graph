@@ -151,7 +151,7 @@ Every executor looks identical to the orchestrator — it just calls `.execute()
 
 `StageExecutor` receives a stage definition and runs all its nodes without touching the artifact store for internal results.
 
-**`__init__`**: takes stage_name, stage_def, node_functions, stage_inputs (values already loaded from the store by the orchestrator), resolve_predecessors_fn (fn_graph's own `_resolve_predecessors`), artifact_store, stage_output_nodes (the boundary set), and ancestor_dag.
+**`__init__`**: takes stage_name, stage_def, node_functions, stage_inputs (values already loaded from the store by the orchestrator), resolve_predecessors_fn (fn_graph's own `_resolve_predecessors`), artifact_store, stage_output_nodes (the boundary set), ancestor_dag, leaf_outputs (the pipeline's terminal outputs), and debug_artifacts (bool).
 
 **`run()`** — the main method:
 1. Determines topological order for nodes in this stage by filtering the ancestor DAG to only this stage's nodes.
@@ -162,9 +162,14 @@ Every executor looks identical to the orchestrator — it just calls `.execute()
    - Determines the executor from the stage's executor config.
    - Calls `executor.execute(node_name, fn, kwargs)`.
    - Stores the result in-memory.
-   - If the node is a stage output (boundary), also writes it to the artifact store so the next stage can load it.
+   - Persists to the artifact store only if the node falls into one of two categories:
+     - **Boundary output** (`stage_output_nodes`) — consumed by a downstream stage
+     - **Leaf output** (`leaf_outputs`) — a final requested output (out-degree 0 in the DAG)
+   - All other intra-stage results stay in memory and are never serialized.
 
-**Key point:** The artifact store is written to only for `stage_output_nodes`. Everything else stays in the `results` dict and is garbage-collected when the stage finishes.
+**`debug_artifacts` flag:** Pass `debug_artifacts=True` (via `--debug-artifacts` CLI flag) to persist every node regardless of category — useful for inspecting intermediate results without changing the pipeline or config.
+
+**Key point:** The artifact store is written to only for boundary outputs and leaf outputs. For a chain A→B→C where only C crosses the stage boundary, A and B produce zero pkl files. The store footprint scales with pipeline structure, not pipeline size.
 
 ---
 
@@ -247,11 +252,12 @@ This means changing a pipeline function requires rebuilding the image — which 
 ## File 9: `run_pipeline.py` — The Entry Point
 
 **`main()`**:
-1. Parses `--pipeline` (dotted module path) and `--config` (YAML path).
+1. Parses `--pipeline` (dotted module path), `--config` (YAML path), `--debug` (verbose logging), and `--debug-artifacts` (persist all node outputs).
 2. Dynamically imports the pipeline module and grabs its `f` (Composer) object.
 3. Applies a pandas compatibility patch if needed (finance pipeline).
-4. Sets up file logging via the `_Tee` class — duplicates stdout to `logs/{pipeline}/{run_id}/{timestamp}.log`.
-5. Calls `get_artifact_store(config)` and builds `execution_config` per node via `get_node_config`.
+4. If `--debug-artifacts` is passed, injects `debug_artifacts=True` into the pipeline config dict so `StageExecutor` persists every node.
+5. Sets up file logging to `logs/{pipeline}/{run_id}/{timestamp}.log`.
+6. Calls `get_artifact_store(config)` and builds `execution_config` per node via `get_node_config`.
 6. **Reconstructs** the plain `Composer` as a `PipelineComposer` by copying its internal state (`_functions`, `_parameters`, etc.) and injecting `execution_config`, `artifact_store`, and `pipeline_config=config`. This is what keeps the pipeline definition file untouched.
 7. Finds **leaf nodes** (out-degree == 0, not parameters) — these are the final outputs.
 8. Calls `pipeline.calculate(leaf_outputs)`.

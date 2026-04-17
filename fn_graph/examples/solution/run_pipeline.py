@@ -91,6 +91,12 @@ def main():
         action="store_true",
         help="Enable debug-level logging (verbose store ops, executor details, etc.)",
     )
+    parser.add_argument(
+        "--debug-artifacts",
+        action="store_true",
+        help="Persist every node's output to the artifact store, including intra-stage nodes. "
+             "Useful for inspecting intermediate results without changing the pipeline.",
+    )
     args = parser.parse_args()
 
     # Phase 1: console-only logging (log_path not known yet)
@@ -120,6 +126,9 @@ def main():
     log.debug("[run_pipeline] composer loaded, building pipeline")
 
     config = load_config(args.config)
+    if args.debug_artifacts:
+        config.setdefault("pipeline", {})["debug_artifacts"] = True
+        log.info("[run_pipeline] --debug-artifacts: all node outputs will be persisted")
     run_id = config["pipeline"]["run_id"]
 
     # Phase 2: add file handler now that log_path is known
