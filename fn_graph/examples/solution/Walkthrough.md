@@ -2,12 +2,14 @@
 
 ## The Big Picture
 
-This project is a **pluggable pipeline execution system** built on top of `fn_graph`. The idea: take any `fn_graph` pipeline (a DAG of Python functions), and run it with configurable executors (in-memory, Docker, Lambda), a persistent artifact store, and optional stage partitioning — without changing the pipeline definition at all.
+This project is a **pluggable pipeline execution system** built on top of `fn_graph`. The idea: take any `fn_graph` pipeline (a DAG of Python functions), and run it with configurable executors (in-memory, Docker, persistent Docker, Lambda), a persistent artifact store, and optional stage partitioning — without changing the pipeline definition at all.
 
 The system has two execution modes:
 
 - **Node-level** (fallback): every node writes to and reads from the artifact store individually.
 - **Stage-based** (when `stages:` is defined in config): nodes are grouped into stages. Results pass in memory within a stage — only boundary nodes (those consumed by a different stage) are persisted to disk. Stages dispatch in parallel where the DAG allows.
+
+The orchestration code lives in `solution/`. The Docker worker image and compose files live in `deploy/` — kept separate because they are infrastructure, not orchestration logic.
 
 ---
 
@@ -30,11 +32,14 @@ At the bottom, a `Composer()` is built by calling `.update()` with all the funct
 
 ---
 
-## File 2: `machine_learning_config.yaml` — Runtime Configuration
+## File 2: `machine_learning_*.yaml` — Runtime Configuration
 
+Two representative configs:
+
+**`machine_learning_local.yaml`** — all stages run in-memory, no Docker:
 ```yaml
 pipeline:
-  run_id: ml_run_001
+  run_id: ml_run_local_001
   on_failure: finish_running
 
 artifact_store:
@@ -49,22 +54,43 @@ stages:
     executor: memory
     nodes: [split_data, training_features, training_target, test_features, test_target]
   training:
-    executor: docker
-    image: fn_graph_worker_v2
+    executor: memory
     nodes: [model]
   evaluation:
     executor: memory
     nodes: [predictions, classification_metrics, confusion_matrix]
-
-nodes:
-  model:
-    executor: docker
-    image: fn_graph_worker_v2
-  "*":
-    executor: memory
 ```
 
-This YAML controls **where** each node runs and **where** results are stored. The `stages:` block activates stage-based execution — nodes in the same stage share memory, only stage boundary nodes touch disk. The `nodes:` block is the fallback for configs without stages.
+**`machine_learning_multi_persistent.yaml`** — each stage routes to its own pre-hosted Docker container:
+```yaml
+pipeline:
+  run_id: ml_run_multi_persistent_001
+  on_failure: finish_running
+
+artifact_store:
+  type: fs
+  base_dir: ./artifacts
+
+stages:
+  preprocessing:
+    executor: persistent_docker
+    url: http://localhost:8001
+    nodes: [iris, data, preprocess_data, investigate_data]
+  splitting:
+    executor: persistent_docker
+    url: http://localhost:8002
+    nodes: [split_data, training_features, training_target, test_features, test_target]
+  training:
+    executor: persistent_docker
+    url: http://localhost:8003
+    nodes: [model]
+  evaluation:
+    executor: persistent_docker
+    url: http://localhost:8004
+    nodes: [predictions, classification_metrics, confusion_matrix]
+```
+
+The `stages:` block activates stage-based execution — nodes in the same stage share memory, only boundary nodes touch disk. The `nodes:` block is the fallback for configs without stages.
 
 ---
 
@@ -75,13 +101,14 @@ Four functions, each with one job:
 **`load_config(yaml_path)`** — reads and parses the YAML file, prints run_id and store type.
 
 **`get_executor(node_config)`** — instantiates the right executor from a node config dict:
-- `type == "memory"` → `InMemoryExecutor`
-- `type == "docker"` → `DockerExecutor(image=...)`
-- `type == "lambda"` → `LambdaExecutor(function_name=..., region=...)`
+- `executor == "memory"` → `InMemoryExecutor()`
+- `executor == "docker"` → `DockerExecutor(image=...)`
+- `executor == "persistent_docker"` → `PersistentDockerExecutor(url=..., timeout=...)`
+- `executor == "lambda"` → `LambdaExecutor(function_name=..., region=...)` *(lazy import — boto3 not required at startup)*
 
 **`get_artifact_store(config)`** — instantiates the right store:
 - `type == "fs"` → `LocalFSArtifactStore(base_dir, run_id)`
-- `type == "s3"` → `S3ArtifactStore(bucket, run_id, region)`
+- `type == "s3"` → `S3ArtifactStore(bucket, run_id, region)` *(lazy import — boto3 not required at startup)*
 
 **`get_node_config(config, node_name)`** — resolves which executor config applies to a node. Checks for a specific node name first, then falls back to the `"*"` wildcard, then defaults to memory.
 
@@ -89,7 +116,7 @@ Four functions, each with one job:
 
 ---
 
-## File 4: `executor/base.py` + `executor/memory.py` + `executor/docker.py` — The Executor Abstraction
+## File 4: `executor/base.py` + `executor/memory.py` + `executor/docker.py` + `executor/persistent_docker.py` — The Executor Abstraction
 
 `BaseExecutor` defines a single method contract:
 
@@ -99,15 +126,22 @@ def execute(self, node_name, fn, kwargs) -> Any
 
 `InMemoryExecutor` just calls `fn(**kwargs)` directly in-process.
 
-`DockerExecutor` is the interesting one:
+`DockerExecutor` is the ephemeral-container variant:
 1. Picks a free port with `_free_port()`
 2. Spins up a Docker container: `docker run -d -p {port}:8000`
 3. Polls `GET /health` every 0.5s until ready (30s timeout)
-4. Serializes the function source + inputs with `cloudpickle`, sends via `POST /execute`
+4. Serializes inputs with `cloudpickle`, sends `POST /execute` with `{node_name, module, kwargs_b64}`
 5. Deserializes the result from the HTTP response body
 6. Stops and removes the container in a `finally` block (always cleaned up, even on error)
 
-Every executor looks identical to the orchestrator — it just calls `.execute()`. Swapping Docker for Lambda or a remote worker needs zero changes to the orchestration logic.
+`PersistentDockerExecutor` is the pre-hosted variant — no container lifecycle management:
+1. Assumes the target container is already running (started externally via `docker compose up`)
+2. Sends `POST /execute` with `{node_name, module, kwargs_b64}` directly to `self.url`
+3. The container resolves the function via `importlib.import_module(module)` + `getattr(mod, node_name)` — no source code travels over the wire
+4. Deserializes and returns the result
+5. On HTTP 500, logs the full traceback from the response body and raises `RuntimeError`
+
+Every executor looks identical to the orchestrator — it just calls `.execute()`. Swapping between executors needs zero changes to orchestration logic.
 
 ---
 
@@ -184,24 +218,29 @@ This is the heart of the system. It subclasses fn_graph's `Composer` and overrid
 
 ---
 
-## File 8: `worker/server.py` — The FastAPI Worker (runs inside Docker)
+## File 8: `deploy/worker/server.py` — The FastAPI Worker (runs inside Docker)
 
-```python
+Lives in `deploy/worker/` — separate from the orchestration layer in `solution/` because it is infrastructure, not orchestration logic.
+
+```
 GET  /health  → {"status": "ok"}
 POST /execute → runs the node, returns result
+               body: { node_name, module, kwargs_b64 }
 ```
 
-`POST /execute` receives `node_name`, `fn_source` (the function's source code as a string), and `kwargs_b64` (cloudpickle-serialized inputs, base64-encoded).
+`POST /execute` receives `node_name`, `module` (the dotted Python module path, e.g. `fn_graph.examples.machine_learning`), and `kwargs_b64` (cloudpickle-serialized inputs, base64-encoded).
 
-It does NOT import the pipeline module. Instead:
-1. `exec(fn_source, namespace)` — executes the function source into a fresh namespace pre-populated with sklearn, pandas, numpy, matplotlib, etc.
-2. `fn = namespace[node_name]` — pulls the function out by name.
-3. `kwargs = cloudpickle.loads(base64.b64decode(kwargs_b64))` — deserializes inputs.
-4. `result = fn(**kwargs)` — runs it.
-5. Returns `{"result_b64": base64(cloudpickle.dumps(result))}`.
-6. On any exception, returns HTTP 500 with full traceback in the response body.
+The worker resolves and runs the function entirely via the Python import system:
+1. `mod = importlib.import_module(module)` — imports the pre-installed pipeline module
+2. `fn = getattr(mod, node_name)` — retrieves the function by name
+3. `kwargs = cloudpickle.loads(base64.b64decode(kwargs_b64))` — deserializes inputs
+4. `result = fn(**kwargs)` — runs it
+5. Returns `{"result_b64": base64(cloudpickle.dumps(result))}`
+6. On any exception, returns HTTP 500 with full traceback in the response body
 
-This design means the worker image is completely pipeline-agnostic — the same image runs any node from any fn_graph pipeline.
+**No `exec()`, no source code over the wire.** The pipeline module (`fn_graph`) is baked into the Docker image at build time (see `deploy/worker/Dockerfile`). The `Dockerfile` copies the `fn_graph/` package into `/app/fn_graph/` and sets `PYTHONPATH=/app`, so `importlib.import_module("fn_graph.examples.machine_learning")` works inside the container.
+
+This means changing a pipeline function requires rebuilding the image — which is the correct tradeoff: the image is the deployment unit, not a string sent over HTTP.
 
 ---
 
@@ -224,14 +263,14 @@ This design means the worker image is completely pipeline-agnostic — the same 
 
 ```
 run_pipeline.py
-  → imports machine_learning.py          (gets the DAG)
-  → reads machine_learning_config.yaml   (gets stages, executor config, store config)
+  → imports machine_learning.py                  (gets the DAG)
+  → reads machine_learning_multi_persistent.yaml (gets stages, executor config, store config)
   → wraps Composer as PipelineComposer
   → calls calculate(leaf_outputs)
       → ancestor_dag + topological sort
       → seed parameters to artifact store
       → load_stages() → stages defined
-      → _analyze_stage_boundaries()      (prints boundary analysis)
+      → _analyze_stage_boundaries()              (prints boundary analysis)
       → _calculate_with_stages()
           → ThreadPoolExecutor dispatches independent stages in parallel
           → for each stage (run_stage):
@@ -243,6 +282,8 @@ run_pipeline.py
                       → executor.execute(fn, kwargs)
                           → memory: fn(**kwargs) directly
                           → docker: spin container → POST /execute → stop
+                          → persistent_docker: POST /execute to pre-running container
+                            (container resolves fn via importlib, no exec())
                       → store result in-memory
                       → if boundary node: artifact_store.put()
               → downstream stages unblocked → dispatch immediately
@@ -260,3 +301,9 @@ Within a stage, data flows as Python objects. Disk is only touched where one sta
 
 **3. The fn_graph interface contract is honoured throughout.**
 `PipelineComposer` inherits all of `Composer`'s methods (`dag()`, `graphviz()`, `check()`, `update()`, `link()`, etc.) unchanged. The only overrides are `__init__`, `_copy`, and `calculate()`. All DAG traversal and dependency resolution is delegated to fn_graph's own methods (`ancestor_dag`, `_resolve_predecessors`).
+
+**4. Infrastructure lives in `deploy/`, orchestration lives in `solution/`.**
+The worker image, Dockerfiles, and compose files are deployment artifacts. They are built and managed independently from the orchestration code. Executor plugins (`persistent_docker.py`, `docker.py`, `lambda_executor.py`) live in `solution/executor/` because they are client-side HTTP clients, not infrastructure.
+
+**5. No source code travels over the wire.**
+`PersistentDockerExecutor` and `DockerExecutor` both send `{node_name, module, kwargs_b64}`. The worker resolves the function via the Python import system from its pre-installed package. No `exec()`, no string-to-code execution surface.
