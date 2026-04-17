@@ -10,7 +10,7 @@ flowchart LR
     B --> C[result]
 ```
 
-Where "somewhere" is decides by config. The composer never needs to know.
+Where "somewhere" is decided by config. The composer never needs to know.
 
 ---
 
@@ -45,18 +45,18 @@ classDiagram
     class InMemoryExecutor {
         +execute(node_name, fn, kwargs) result
     }
-    class LocalDockerExecutor {
+    class DockerExecutor {
         +execute(node_name, fn, kwargs) result
     }
-    class AWSDockerExecutor {
+    class PersistentDockerExecutor {
         +execute(node_name, fn, kwargs) result
     }
     class LambdaExecutor {
         +execute(node_name, fn, kwargs) result
     }
     BaseExecutor <|-- InMemoryExecutor
-    BaseExecutor <|-- LocalDockerExecutor
-    BaseExecutor <|-- AWSDockerExecutor
+    BaseExecutor <|-- DockerExecutor
+    BaseExecutor <|-- PersistentDockerExecutor
     BaseExecutor <|-- LambdaExecutor
 ```
 
@@ -84,24 +84,7 @@ Use this for local dev and unit tests. No overhead.
 
 ## DockerExecutor
 
-The main redesign. Container no longer runs a one-shot script and dies. It runs a FastAPI server and waits for requests.
-
-```mermaid
-flowchart TD
-    subgraph BEFORE
-        A[subprocess.run docker run worker.py] --> B[container runs, exits]
-        B --> C[check for pkl file]
-    end
-
-    subgraph AFTER
-        D[docker run fn_graph_worker] --> E[FastAPI server starts on :8000]
-        E --> F[GET /health]
-        F --> G[POST /execute\nfn_source + kwargs]
-        G --> H[result in HTTP response]
-    end
-```
-
-Full flow:
+Spins up a fresh container per node, sends work, tears it down when done.
 
 ```mermaid
 sequenceDiagram
@@ -111,23 +94,67 @@ sequenceDiagram
     participant FastAPI
 
     PipelineComposer->>DockerExecutor: execute("model", model_fn, {kwargs})
-    DockerExecutor->>Container: docker run fn_graph_worker
+    DockerExecutor->>Container: docker run fn_graph_worker_v2
     Container->>FastAPI: server starts on :8000
     DockerExecutor->>FastAPI: GET /health
     FastAPI-->>DockerExecutor: 200 OK
-    DockerExecutor->>FastAPI: POST /execute\n{node_name, fn_source, kwargs_b64}
-    FastAPI->>FastAPI: exec(fn_source)\nresult = fn(**kwargs)
+    DockerExecutor->>FastAPI: POST /execute\n{node_name, module, kwargs_b64}
+    FastAPI->>FastAPI: importlib.import_module(module)\nfn = getattr(mod, node_name)\nresult = fn(**kwargs)
     FastAPI-->>DockerExecutor: {result_b64}
+    DockerExecutor->>Container: docker stop + rm
     DockerExecutor-->>PipelineComposer: deserialized result
 ```
 
-What the container exposes:
+**Cost:** one container boot per node. Acceptable for occasional heavy nodes. Expensive for many fast nodes.
+
+---
+
+## PersistentDockerExecutor
+
+Containers are started once externally (via `docker compose up`) and stay running for the entire pipeline. No boot cost per node — just an HTTP call.
 
 ```mermaid
-flowchart LR
-    A[fn_graph_worker container] --> B["GET /health\nis it alive?"]
-    A --> C["POST /execute\nrun a function, return result"]
-    A --> D["GET /result/node\nfetch cached result"]
+sequenceDiagram
+    participant PipelineComposer
+    participant PersistentDockerExecutor
+    participant Container
+
+    Note over Container: already running, started by docker compose
+
+    PipelineComposer->>PersistentDockerExecutor: execute("model", model_fn, {kwargs})
+    PersistentDockerExecutor->>Container: POST /execute\n{node_name, module, kwargs_b64}
+    Container->>Container: importlib.import_module(module)\nfn = getattr(mod, node_name)\nresult = fn(**kwargs)
+    Container-->>PersistentDockerExecutor: {result_b64}
+    PersistentDockerExecutor-->>PipelineComposer: deserialized result
+```
+
+**Key difference from DockerExecutor:** the pipeline module is pre-installed inside the Docker image. The executor sends only the module path (`fn.__module__`) and node name — no source code over the wire, no `exec()`. The container resolves the function via `importlib.import_module` + `getattr`.
+
+### Per-stage container isolation
+
+Each pipeline stage can be routed to its own dedicated container:
+
+```yaml
+stages:
+  preprocessing:
+    executor: persistent_docker
+    url: http://localhost:8001
+    nodes: [iris, data, preprocess_data, investigate_data]
+
+  training:
+    executor: persistent_docker
+    url: http://localhost:8003
+    nodes: [model]
+```
+
+The corresponding `docker-compose-multi.yml` (in `deploy/`) defines one service per stage. Containers are started once before the pipeline run and torn down after.
+
+### Worker contract
+
+```
+GET  /health               → { status: "ok" }
+POST /execute              → { result_b64 }
+     body: { node_name, module, kwargs_b64 }
 ```
 
 ---
@@ -147,19 +174,19 @@ nodes:
     memory: 512
     timeout: 30
   predictions:
-    executor: local_docker
-    image: fn_graph_worker
+    executor: persistent_docker
+    url: http://localhost:8004
   "*":
     executor: memory
 ```
 
 ```mermaid
 flowchart TD
-    A[pipeline_config.yaml] --> B[config.py\nExecutorFactory]
+    A[pipeline_config.yaml] --> B[config.py]
     B --> C{node name lookup}
     C -->|iris| D[InMemoryExecutor]
     C -->|model| E[LambdaExecutor\nmemory=512, timeout=30]
-    C -->|predictions| F[LocalDockerExecutor\nimage=fn_graph_worker]
+    C -->|predictions| F[PersistentDockerExecutor\nurl=localhost:8004]
     C -->|anything else| G[InMemoryExecutor\ndefault fallback]
 ```
 
@@ -171,32 +198,36 @@ Functions stay clean. No infrastructure config inside business logic. Switching 
 
 ```mermaid
 flowchart LR
-    A[pipeline_config.yaml] --> B[ExecutorFactory.create]
+    A[pipeline_config.yaml] --> B[config.get_executor]
     B --> C[InMemoryExecutor]
-    B --> D[LocalDockerExecutor]
-    B --> E[AWSDockerExecutor]
+    B --> D[DockerExecutor]
+    B --> E[PersistentDockerExecutor]
     B --> F[LambdaExecutor]
 ```
 
 ```python
-executor = ExecutorFactory.create(config.get_node_config(node_name))
+executor = get_executor(config.get_node_config(node_name))
 result = executor.execute(node_name, fn, kwargs)
 ```
 
 ---
 
-## Why functions are shipped as source code not bytecode
+## Why functions are resolved by module import, not source shipping
 
 ```mermaid
 flowchart LR
-    A[host Python 3.12] -->|cloudpickle fn bytecode| B[container Python 3.11]
-    B --> C[segfault\nno exception\njust crashes]
-
-    D[host Python 3.12] -->|fn source as string| E[container Python 3.11]
-    E -->|exec, compiles with own Python| F[works fine]
+    A[executor] -->|POST /execute\nmodule + node_name| B[worker container]
+    B -->|importlib.import_module| C[function from installed package]
+    C --> D[fn(**kwargs)]
 ```
 
-Cloudpickle serializes a function including its bytecode. Bytecode format changes between Python versions. Shipping plain source text avoids this entirely. The container compiles it with its own Python.
+The pipeline module is baked into the Docker image at build time. The worker calls `importlib.import_module(module)` and `getattr(mod, node_name)` to retrieve the function. No source code travels over HTTP, no `exec()` runs in the container.
+
+This is safer and simpler than the alternative (shipping source as a string):
+- No cross-version bytecode issues
+- No `exec()` security surface
+- Functions have their correct `__module__` context at runtime
+- Changing a function means rebuilding the image, not patching a string
 
 ---
 
@@ -204,5 +235,6 @@ Cloudpickle serializes a function including its bytecode. Bytecode format change
 
 - Executor is per node, not per pipeline. Each node can run somewhere different.
 - The `"*"` entry in config is the fallback. Any node not explicitly listed uses it.
-- Source code shipping over HTTP preserves the same cross-version safety the current `worker.py` already had.
-- LambdaExecutor posts to a Lambda function URL instead of a local Docker port. The handler logic inside Lambda and the FastAPI handler share the same function-execution core.
+- `DockerExecutor` and `PersistentDockerExecutor` both use the same worker image (`fn_graph_worker_v2`) and the same `/execute` HTTP contract. The difference is lifecycle: ephemeral vs persistent.
+- `LambdaExecutor` posts to a Lambda function URL. The handler inside Lambda shares the same module-import execution model.
+- Optional dependencies (`boto3` for Lambda/S3) are lazy-loaded — not required at startup unless that executor type is actually used.

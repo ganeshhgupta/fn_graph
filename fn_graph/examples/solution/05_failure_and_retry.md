@@ -104,14 +104,16 @@ When to use each:
 
 Because of memoization and run IDs, resume is free. No special logic.
 
+With **stage-based execution**, resume is coarser but faster — an entire stage is skipped if all its boundary output nodes already exist in the artifact store. A single failed node in a stage means the whole stage re-runs on resume (only boundary nodes are persisted, so intra-stage progress is not saved).
+
 ```mermaid
 flowchart TD
     A[pipeline crashes at node 7] --> B[fix the issue]
     B --> C[rerun with same run_id]
-    C --> D{artifact_store.exists\nfor each node?}
-    D -->|nodes 1-6: yes| E[skip, already computed]
-    D -->|nodes 7-12: no| F[run normally]
-    E --> G[pipeline continues from node 7]
+    C --> D{artifact_store.exists\nfor each stage boundary?}
+    D -->|stage fully memoized| E[skip entire stage]
+    D -->|boundary outputs missing| F[run stage from scratch]
+    E --> G[pipeline continues from first non-memoized stage]
     F --> G
 ```
 
@@ -137,15 +139,15 @@ sequenceDiagram
 
     Note over Orchestrator,ArtifactStore: next run, same run_id
 
-    Orchestrator->>ArtifactStore: exists("iris")?
-    ArtifactStore-->>Orchestrator: yes, skip
-    Orchestrator->>ArtifactStore: exists("data")?
-    ArtifactStore-->>Orchestrator: yes, skip
-    Note over Orchestrator: skips all completed nodes
+    Orchestrator->>ArtifactStore: exists("preprocess_data")?
+    ArtifactStore-->>Orchestrator: yes — skip preprocessing stage
+    Orchestrator->>ArtifactStore: exists("training_features"), exists("test_features")...?
+    ArtifactStore-->>Orchestrator: yes — skip splitting stage
+    Note over Orchestrator: skips memoized stages
     Orchestrator->>Executor: execute("model", fn, kwargs)
     Executor-->>Orchestrator: success
     ArtifactStore-->>Orchestrator: model.pkl written
-    Note over Orchestrator: continues from model onward
+    Note over Orchestrator: continues from training stage onward
 ```
 
 ---
@@ -172,5 +174,6 @@ stateDiagram-v2
 - Retry config is per node. A Lambda function that frequently times out can have more retries than a local in-memory function that almost never fails.
 - Downstream cancellation is automatic. No code needed to propagate failure. The join condition handles it.
 - Resume is free because of memoization. Same run_id, artifacts that exist get skipped.
+- With stages, resume granularity is per stage, not per node. A stage either fully re-runs or is fully skipped.
 - `on_failure: continue` is useful when the pipeline has genuinely independent branches where partial results are still valuable.
 - Always log which nodes were DONE, which were BLOCKED, and which were implicitly cancelled at the end of a failed run. Makes debugging fast.

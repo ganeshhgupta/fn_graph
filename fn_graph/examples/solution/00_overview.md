@@ -30,7 +30,7 @@ flowchart TD
     A[your pipeline functions\nuntouched] --> B[PipelineComposer]
     B --> C[Executor\nper-node, swappable]
     B --> D[ArtifactStore\npluggable backend]
-    C --> E[memory / docker / lambda]
+    C --> E[memory / docker / persistent_docker / lambda]
     D --> F[local FS / S3 / ElastiCache]
 ```
 
@@ -47,17 +47,18 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[pipeline_config.yaml] --> B[PipelineComposer]
-    B --> C{for each node\nin parallel where possible}
+    B --> C{for each stage\nor node in parallel}
     C --> D{output exists?}
     D -->|yes| E[skip]
     D -->|no| F[Executor\nper-node config]
     F --> G[InMemoryExecutor]
     F --> H[DockerExecutor]
-    F --> I[LambdaExecutor]
-    G & H & I --> J[ArtifactStore]
-    J --> K[LocalFS]
-    J --> L[S3]
-    J --> M[ElastiCache]
+    F --> I[PersistentDockerExecutor]
+    F --> J[LambdaExecutor]
+    G & H & I & J --> K[ArtifactStore]
+    K --> L[LocalFS]
+    K --> M[S3]
+    K --> N[ElastiCache]
 ```
 
 ---
@@ -66,8 +67,9 @@ flowchart TD
 
 | | |
 |---|---|
-| [01 - Extending fn_graph](https://github.com/ganeshhgupta/fn_graph/blob/master/fn_graph/examples/solution/01_fn_graph_extension.md) | PipelineComposer, how we wrap fn_graph without touching its internals |
-| [02 - Executor](https://github.com/ganeshhgupta/fn_graph/blob/master/fn_graph/examples/solution/02_executor.md) | How nodes run, per-node config, FastAPI-based Docker redesign |
-| [03 - Artifact Store](https://github.com/ganeshhgupta/fn_graph/blob/master/fn_graph/examples/solution/03_artifact_store.md) | Where data lives, memoization, run IDs, pluggable backends |
-| [04 - Parallelism](https://github.com/ganeshhgupta/fn_graph/blob/master/fn_graph/examples/solution/04_parallelism.md) | Queue system, node states, automatic parallel execution |
-| [05 - Failure and Retry](https://github.com/ganeshhgupta/fn_graph/blob/master/fn_graph/examples/solution/05_failure_and_retry.md) | Retry logic, failure modes, mid-pipeline resume |
+| [01 - Extending fn_graph](01_fn_graph_extension.md) | PipelineComposer, how we wrap fn_graph without touching its internals |
+| [02 - Executor](02_executor.md) | How nodes run, per-node config, Docker and PersistentDocker executors |
+| [03 - Artifact Store](03_artifact_store.md) | Where data lives, memoization, run IDs, pluggable backends |
+| [04 - Parallelism](04_parallelism.md) | Queue system, node states, stage-level and node-level parallel execution |
+| [05 - Failure and Retry](05_failure_and_retry.md) | Retry logic, failure modes, mid-pipeline resume |
+| [06 - Production Readiness](06_prod_readiness.md) | What stands between this design and 80-node CNN production workloads |

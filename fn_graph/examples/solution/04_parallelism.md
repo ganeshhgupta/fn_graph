@@ -1,5 +1,16 @@
 # 04 - Parallelism
 
+## Two levels of parallelism
+
+The system supports parallelism at two granularities:
+
+1. **Stage-level parallelism** — independent stages dispatch simultaneously via `ThreadPoolExecutor`
+2. **Node-level parallelism** — within a stage (or without stages), independent nodes run concurrently
+
+Both are automatic. Neither requires manual configuration. The DAG decides.
+
+---
+
 ## The problem with a simple loop
 
 Right now nodes execute one at a time in a flat loop.
@@ -38,9 +49,27 @@ This is automatic for every pipeline, not just the iris example.
 
 ---
 
-## The queue system
+## Stage-level parallel dispatch
 
-Instead of a simple loop, the orchestrator runs a queue.
+When stages are defined, the orchestrator builds a stage-level DAG from boundary node relationships. Independent stages dispatch simultaneously.
+
+```mermaid
+flowchart TD
+    A[stage DAG built from\nboundary analysis] --> B[find stages with\nno unmet dependencies]
+    B --> C[dispatch all ready stages\nvia ThreadPoolExecutor]
+    C --> D{stage finishes}
+    D --> E[check which downstream\nstages just unblocked]
+    E --> F[dispatch newly ready stages]
+    F --> D
+```
+
+In the ML pipeline the stages are linear (preprocessing → splitting → training → evaluation), so they run sequentially. In a pipeline with independent branches, those branches would dispatch simultaneously.
+
+---
+
+## Node-level queue system
+
+Within a stage (or when no stages are configured), the orchestrator runs a ready queue over individual nodes.
 
 ```mermaid
 flowchart TD
@@ -169,7 +198,8 @@ gantt
 
 ## Key Notes
 
-- Parallelism is automatic. Never configure it. The DAG decides.
+- Parallelism is automatic at both stage and node level. Never configure it. The DAG decides.
 - The join condition is strict: all predecessors must be DONE, not just started.
-- Worker threads or async tasks dispatch to executors. Each executor handles its own network call or subprocess independently.
-- Artifact store must handle concurrent writes safely. LocalFS uses atomic rename. S3 put_object is atomic by default.
+- Worker threads dispatch to executors. Each executor handles its own network call or subprocess independently.
+- Artifact store must handle concurrent writes safely. LocalFS uses atomic rename. S3 `put_object` is atomic by default.
+- Stage-level parallelism is coarser but reduces artifact store I/O — only boundary nodes are persisted, not every intermediate result.

@@ -10,18 +10,21 @@ This doc covers what stands between the current design and production.
 
 ## What breaks first
 
-### Model loading per container
+### ~~Model loading per container~~ ✓ Addressed by PersistentDockerExecutor
 
-Right now each container starts fresh, runs the function, exits. For logistic regression that is fine. For a CNN checkpoint that is 200MB-2GB, loading from scratch per node per run means:
+The original problem: each container starts fresh, runs the function, exits. For a CNN checkpoint that is 200MB-2GB, loading from scratch per node per run means 40+ minutes of cold-start overhead before any real work happens.
+
+**This is now addressed.** `PersistentDockerExecutor` routes work to pre-hosted long-running containers. Containers are started once via `docker compose up` and stay alive for the entire pipeline run — no boot cost per node, just an HTTP call. Models loaded once into GPU memory remain warm across all nodes routed to that container.
 
 ```mermaid
 flowchart LR
-    A[container starts] --> B[pull model from S3\n30-60 seconds]
-    B --> C[run inference\n2-5 seconds]
-    C --> D[container exits]
+    A[docker compose up\none-time startup] --> B[container running\nmodel in memory]
+    B --> C[POST /execute node_1\n~ms]
+    B --> D[POST /execute node_2\n~ms]
+    B --> E[POST /execute node_N\n~ms]
 ```
 
-80 nodes. Each loading a model cold. Pipeline startup alone takes 40+ minutes before any real work happens.
+Each stage can be routed to its own dedicated container via `machine_learning_multi_persistent.yaml`. Multiple stages can share a container or have separate ones depending on isolation and resource needs.
 
 ### The pkl file assumption
 
@@ -35,39 +38,23 @@ The parallel queue dispatches all unblocked nodes simultaneously. With 80 CNN no
 
 ---
 
-## The 10 missing pieces
+## The remaining pieces
 
-### 1. Warm container pools
-
-CNN models cannot load cold per node. Need long-lived containers with models already in GPU memory.
-
-```mermaid
-flowchart TD
-    A[DockerExecutor] --> B{warm container\navailable?}
-    B -->|yes| C[send work directly\n0s model load]
-    B -->|no| D[start container\nload model\n30-60s one-time cost]
-    D --> E[add to warm pool]
-    C --> F[run inference]
-    E --> F
-```
-
-On Lambda this means provisioned concurrency. On Docker this means a persistent worker pool, not `--rm` containers. The `--rm` flag that cleans up containers after each node needs to become configurable.
-
----
-
-### 2. Resource-aware scheduler
+### 1. Resource-aware scheduler
 
 The parallel queue has no concept of GPU or memory constraints. Every node needs to declare what it requires. Scheduler only dispatches when those resources are actually free.
 
 ```yaml
 nodes:
   cnn_module_1:
-    executor: docker
+    executor: persistent_docker
+    url: http://localhost:8001
     resources:
       gpu: 1
       memory_gb: 16
   cnn_module_2:
-    executor: docker
+    executor: persistent_docker
+    url: http://localhost:8002
     resources:
       gpu: 2
       memory_gb: 32
@@ -86,7 +73,7 @@ Without this, 80 CNN nodes dispatched simultaneously will crash the cluster.
 
 ---
 
-### 3. Format-aware artifact serialization
+### 2. Format-aware artifact serialization
 
 Cloudpickle is the wrong tool for large tensors and model checkpoints. ArtifactStore needs pluggable serializers per artifact type.
 
@@ -111,7 +98,7 @@ nodes:
 
 ---
 
-### 4. Batch processing
+### 3. Batch processing
 
 Right now the pipeline processes one input at a time. 1000 chest X-rays through 80 CNN modules one by one is not viable. Need a batch dimension where the same DAG runs over N inputs with dynamic batching per node based on available GPU memory.
 
@@ -127,7 +114,7 @@ Each node declares its preferred batch size. Orchestrator manages batching and r
 
 ---
 
-### 5. Data lineage and audit trail
+### 4. Data lineage and audit trail
 
 Medical imaging is regulated. Every output needs a full traceable history.
 
@@ -146,9 +133,9 @@ Run IDs alone are not enough. Need:
 
 ---
 
-### 6. Observability
+### 5. Observability
 
-80 nodes, some on Lambda, some on Docker, some retrying. Print statements scattered across container stdouts are not enough.
+80 nodes, some on Lambda, some in persistent Docker containers, some retrying. Print statements scattered across container stdouts are not enough.
 
 ```mermaid
 flowchart TD
@@ -165,7 +152,7 @@ Specifically missing:
 
 ---
 
-### 7. DAG partitioning by node weight
+### 6. DAG partitioning by node weight
 
 Lambda has a 15-minute timeout. Heavy CNN inference will exceed it. Some nodes belong on Lambda. Some belong on GPU EC2. The YAML config handles which executor per node, but right now that is manual.
 
@@ -182,7 +169,7 @@ flowchart TD
 
 ---
 
-### 8. Schema validation between nodes
+### 7. Schema validation between nodes
 
 Right now nodes accept whatever the upstream node wrote. No validation. If CNN module 12 outputs shape `(batch, 512, 512, 1)` but module 13 expects `(batch, 256, 256, 3)`, the pipeline crashes deep inside inference with a cryptic shape mismatch.
 
@@ -208,7 +195,7 @@ Catch shape mismatches at the boundary, not inside the next CNN module.
 
 ---
 
-### 9. Secrets management
+### 8. Secrets management
 
 DICOM datasets, hospital S3 buckets, model registries. Containers and Lambda functions need credentials. No mechanism exists for this yet.
 
@@ -223,7 +210,7 @@ Credentials must never appear in the YAML config, in logs, or in artifact metada
 
 ---
 
-### 10. Cost accounting
+### 9. Cost accounting
 
 80 Lambda invocations per run, potentially hundreds of runs per day. No visibility into which nodes are expensive.
 
@@ -240,28 +227,28 @@ Without this, you have no way to know whether CNN module 34 costs $0.001 or $2.0
 
 ## Priority order
 
-The first four are blockers. The pipeline will not run on 80 CNN nodes without them.
-
 ```mermaid
 flowchart TD
-    A[Critical blockers] --> B[1. Warm container pools\nmodel load time]
-    A --> C[2. Resource-aware scheduler\nGPU allocation]
-    A --> D[3. Format-aware serialization\ntensor and DICOM support]
-    A --> E[4. Batch processing\nthroughput]
+    A[Addressed] --> Z[~~Warm container pools~~\nPersistentDockerExecutor handles this]
 
-    F[High priority] --> G[5. Data lineage\nregulatory requirement]
-    F --> H[6. Observability\n80 nodes need tracing]
-    F --> I[7. DAG partitioning\nLambda timeout risk]
-    F --> J[8. Schema validation\nshape mismatches]
+    B[Critical blockers] --> C[1. Resource-aware scheduler\nGPU allocation]
+    B --> D[2. Format-aware serialization\ntensor and DICOM support]
+    B --> E[3. Batch processing\nthroughput]
 
-    K[Medium priority] --> L[9. Secrets management]
-    K --> M[10. Cost accounting]
+    F[High priority] --> G[4. Data lineage\nregulatory requirement]
+    F --> H[5. Observability\n80 nodes need tracing]
+    F --> I[6. DAG partitioning\nLambda timeout risk]
+    F --> J[7. Schema validation\nshape mismatches]
+
+    K[Medium priority] --> L[8. Secrets management]
+    K --> M[9. Cost accounting]
 ```
 
 ---
 
 ## Key Notes
 
-- Docs 01-05 describe the correct architecture. Nothing in those docs needs to change. These 10 items are additions on top of that foundation, not replacements.
-- Items 1-4 should be scoped into the first production milestone. Skipping any of them means the pipeline will not complete a full run on real chest X-ray data.
-- Data lineage (item 5) may be a hard regulatory requirement depending on how the pipeline outputs are used clinically. Confirm this early.
+- Docs 01-05 describe the correct architecture. Nothing in those docs needs to change. These items are additions on top of that foundation, not replacements.
+- Items 1-3 should be scoped into the first production milestone. Skipping any of them means the pipeline will not complete a full run on real chest X-ray data.
+- Data lineage (item 4) may be a hard regulatory requirement depending on how the pipeline outputs are used clinically. Confirm this early.
+- `PersistentDockerExecutor` resolves the warm-container problem for Docker-based workloads. For Lambda, provisioned concurrency is the equivalent mechanism.

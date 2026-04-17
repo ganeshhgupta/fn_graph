@@ -9,12 +9,13 @@ A pluggable execution layer on top of [fn_graph](https://github.com/BusinessOpti
 ```mermaid
 graph TD
     CLI["run_pipeline.py\n(CLI entry point)"]
-    CFG["machine_learning_config.yaml\n(stages, executors, artifact store)"]
+    CFG["machine_learning_*.yaml\n(stages, executors, artifact store)"]
     ORC["PipelineComposer\n(orchestrator)"]
     ART["ArtifactStore\n(local disk or S3)"]
-    SA["StageExecutor\n(runs one stage in-memory)"]
+    SA["StageExecutor\n(runs one stage)"]
     MEM["InMemoryExecutor\n(runs in Python process)"]
-    DOC["DockerExecutor\n(spins up local container)"]
+    DOC["DockerExecutor\n(spins up ephemeral container)"]
+    PDE["PersistentDockerExecutor\n(calls pre-hosted container via HTTP)"]
     LAM["LambdaExecutor\n(invokes AWS Lambda)"]
     LOG["logs/\n(one file per run)"]
 
@@ -24,6 +25,7 @@ graph TD
     ORC --> SA
     SA --> MEM
     SA --> DOC
+    SA --> PDE
     SA --> LAM
     ORC --> LOG
 ```
@@ -46,7 +48,7 @@ sequenceDiagram
 
     O->>S2: run stage (preprocess_data ready in store)
     S2->>A: get(preprocess_data)
-    S2->>S2: model (runs in Docker)
+    S2->>S2: model (runs via executor)
     S2->>A: put(model)  ← boundary node
     S2-->>O: done
 ```
@@ -77,35 +79,42 @@ sequenceDiagram
 ## Folder Structure
 
 ```
-solution/
-├── run_pipeline.py           # CLI entry point
-├── composer.py               # orchestrator — walks DAG, calls executors or StageExecutor
-├── config.py                 # loads yaml, builds executors, artifact stores, and stages
-├── deploy_lambda.py          # one-shot Lambda deploy script
+solution/                             <- fn_graph orchestration layer
+├── run_pipeline.py                   # CLI entry point
+├── composer.py                       # orchestrator — walks DAG, dispatches stages/nodes
+├── config.py                         # loads yaml, builds executors, artifact stores, stages
 │
-├── machine_learning_config.yaml  # ML pipeline: memory + docker, with stage partitioning
-├── machine_learning_local.yaml   # ML pipeline: all memory, no Docker
+├── machine_learning_config.yaml      # ML pipeline: memory + docker, stage partitioning
+├── machine_learning_local.yaml       # ML pipeline: all in-memory, no Docker
+├── machine_learning_multi_persistent.yaml  # ML pipeline: one persistent container per stage
 │
 ├── executor/
-│   ├── base.py               # BaseExecutor (abstract)
-│   ├── memory.py             # runs fn directly in process
-│   ├── docker.py             # spins up container, HTTP call, tears down
-│   ├── lambda_executor.py    # boto3 invoke, returns result
-│   └── stage_executor.py     # runs all nodes in one stage in-memory, persists boundaries
+│   ├── base.py                       # BaseExecutor (abstract)
+│   ├── memory.py                     # runs fn directly in Python process
+│   ├── docker.py                     # spins up ephemeral container, HTTP call, tears down
+│   ├── persistent_docker.py          # calls pre-hosted container via HTTP, no exec()
+│   ├── lambda_executor.py            # boto3 invoke, returns result
+│   └── stage_executor.py             # runs all nodes in one stage, persists boundaries
 │
 ├── artifact_store/
-│   ├── base.py               # BaseArtifactStore (abstract)
-│   ├── fs.py                 # local disk — artifacts/{run_id}/{node}.pkl
-│   └── s3.py                 # S3 — s3://bucket/{run_id}/{node}.pkl
-│
-├── worker/
-│   ├── server.py             # FastAPI app inside Docker container
-│   ├── lambda_handler.py     # handler inside Lambda
-│   ├── Dockerfile            # image for DockerExecutor
-│   └── Dockerfile.lambda     # image for LambdaExecutor (pushed to ECR)
+│   ├── base.py                       # BaseArtifactStore (abstract)
+│   ├── fs.py                         # local disk — artifacts/{run_id}/{node}.pkl
+│   └── s3.py                         # S3 — s3://bucket/{run_id}/{node}.pkl
 │
 └── logs/
     └── {pipeline}/{run_id}/{timestamp}.log
+
+deploy/                               <- infrastructure (separate from orchestration)
+├── worker/
+│   ├── server.py                     # FastAPI worker — imports fn by module name, no exec()
+│   ├── Dockerfile                    # fn_graph_worker_v2 image (fn_graph pre-installed)
+│   ├── Dockerfile.lambda             # image for LambdaExecutor (pushed to ECR)
+│   ├── lambda_handler.py             # Lambda handler
+│   ├── requirements.txt
+│   └── requirements.lambda.txt
+├── docker-compose.yml                # single shared worker on port 8001
+├── docker-compose-multi.yml          # one worker per stage, ports 8001-8004
+└── lambda.py                         # one-shot Lambda deploy script
 ```
 
 ---
@@ -116,48 +125,77 @@ solution/
 
 Set `PYTHONPATH` so the `fn_graph` package is importable:
 
+**Windows (cmd):**
 ```cmd
-set PYTHONPATH=C:\Users\GuptaGanesh\Desktop\new\fn_graph
+set PYTHONPATH=C:\Users\GuptaGanesh\Desktop\New folder\fn_graph
 ```
 
-Or on Linux/macOS:
+**Windows (PowerShell):**
+```powershell
+$env:PYTHONPATH="C:\Users\GuptaGanesh\Desktop\New folder\fn_graph"
+```
+
+**Linux/macOS:**
 ```bash
 export PYTHONPATH=/path/to/fn_graph
 ```
 
-### Run the ML pipeline
+### Run locally (no Docker)
 
 ```cmd
 cd fn_graph\examples\solution
-python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config machine_learning_config.yaml
-```
-
-Run it a second time to verify memoization — all nodes should be skipped and the run completes in under a second.
-
-### Run with a different config (no Docker)
-
-```cmd
 python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config machine_learning_local.yaml
 ```
 
-### Run the finance pipeline
+Run it a second time to verify memoization — all stages are skipped and the run completes in under a second.
+
+### Run with persistent Docker containers (one per stage)
+
+**Step 1 — start the containers (one-time):**
+```cmd
+cd fn_graph\examples\deploy
+docker compose -f docker-compose-multi.yml build
+docker compose -f docker-compose-multi.yml up -d
+```
+
+**Step 2 — run the pipeline:**
+```cmd
+cd fn_graph\examples\solution
+set PYTHONPATH=C:\Users\GuptaGanesh\Desktop\New folder\fn_graph && python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config machine_learning_multi_persistent.yaml
+```
+
+**Tear down when done:**
+```cmd
+cd fn_graph\examples\deploy
+docker compose -f docker-compose-multi.yml down
+```
+
+### Run with debug logging
 
 ```cmd
-python run_pipeline.py --pipeline fn_graph.examples.finance --config finance_config.yaml
+set PYTHONPATH=C:\Users\GuptaGanesh\Desktop\New folder\fn_graph && python run_pipeline.py --pipeline fn_graph.examples.machine_learning --config machine_learning_multi_persistent.yaml --debug
 ```
 
 ---
 
-## Docker Build
+## Executor Types
 
-The Docker worker image must be built before running any node with `executor: docker`:
+| Executor | When to use | Container lifecycle |
+|---|---|---|
+| `memory` | Local dev, fast nodes, unit tests | None — runs in-process |
+| `docker` | Isolated execution, one-off heavy nodes | Spin up per node, tear down after |
+| `persistent_docker` | Warm containers, repeated calls, pre-loaded models | Started externally via compose, stays running |
+| `lambda` | Serverless, pay-per-call, burst workloads | Managed by AWS |
 
-```cmd
-cd fn_graph\examples\solution
-docker build -t fn_graph_worker_v2 ./worker/
+### How PersistentDockerExecutor works
+
+The pipeline module is pre-installed inside the Docker image. When a node is dispatched, the executor sends only `{node_name, module, kwargs_b64}` — no source code over HTTP. The worker resolves the function via `importlib.import_module(module)` + `getattr(mod, node_name)`.
+
 ```
-
-This builds the FastAPI worker server that receives function source + pickled inputs over HTTP, executes the node, and returns the pickled result.
+GET  /health               → { status: "ok" }
+POST /execute              → { result_b64 }
+     body: { node_name, module, kwargs_b64 }
+```
 
 ---
 
@@ -200,8 +238,8 @@ stages:
     nodes: [split_data, training_features, training_target, test_features, test_target]
 
   training:
-    executor: docker
-    image: fn_graph_worker_v2
+    executor: persistent_docker
+    url: http://localhost:8003
     nodes: [model]
 
   evaluation:
@@ -210,29 +248,13 @@ stages:
 ```
 
 - Every node must appear in exactly one stage.
-- The `executor` key applies to all nodes in the stage. For `docker`, also specify `image`.
+- The `executor` key applies to all nodes in the stage.
+- For `persistent_docker`, also specify `url`.
 - Node order within `nodes:` does not matter — topological order is derived from the DAG.
 
 ### Parallel stage dispatch
 
 Stages with no un-met dependencies are dispatched simultaneously using `ThreadPoolExecutor`. The orchestrator waits for completed stages with `FIRST_COMPLETED`, then checks which downstream stages just became unblocked, and dispatches them immediately.
-
-In the ML pipeline, `preprocessing` and (conceptually) any unrelated stage run first. Once `preprocessing` completes, `splitting` is dispatched. Once `splitting` completes, `training` is dispatched. Once `training` completes, `evaluation` is dispatched. (Linear DAG here — no parallelism between these specific stages, but the infrastructure supports parallel branches.)
-
-### How to add a new stage
-
-1. Identify which nodes belong to the new stage.
-2. Remove those nodes from their current stage's `nodes:` list.
-3. Add a new stage entry:
-
-```yaml
-stages:
-  my_new_stage:
-    executor: memory   # or docker / lambda
-    nodes: [node_a, node_b]
-```
-
-4. The orchestrator automatically detects new boundary nodes and adjusts the stage DAG.
 
 ---
 
@@ -240,27 +262,28 @@ stages:
 
 ```yaml
 pipeline:
-  run_id: ml_run_001        # unique ID — artifacts saved under artifacts/{run_id}/
-  on_failure: finish_running  # keep going if a node fails (currently informational)
+  run_id: ml_run_001          # unique ID — artifacts saved under artifacts/{run_id}/
+  on_failure: finish_running  # keep going if a node fails
 
 artifact_store:
-  type: fs                  # "fs" = local disk, "s3" = AWS S3
-  base_dir: ./artifacts     # root folder for all artifacts (fs only)
+  type: fs                    # "fs" = local disk, "s3" = AWS S3
+  base_dir: ./artifacts       # root folder for all artifacts (fs only)
   # For S3:
   # bucket: my-fn-graph-bucket
   # region: us-east-1
 
-stages:                     # optional — enables stage-based execution
+stages:                       # optional — enables stage-based execution
   stage_name:
-    executor: memory        # executor for all nodes in this stage
+    executor: memory          # memory | docker | persistent_docker | lambda
+    url: http://localhost:8001  # required for persistent_docker
     nodes: [node1, node2]
 
-nodes:                      # fallback node-level config (used when no stages: defined)
+nodes:                        # fallback node-level config (used when no stages: defined)
   model:
     executor: docker
     image: fn_graph_worker_v2
   "*":
-    executor: memory        # default for any node not listed above
+    executor: memory          # default for any node not listed above
 ```
 
 ---
@@ -306,19 +329,10 @@ Log path pattern: `logs/{pipeline_name}/{run_id}/{timestamp}.log`
   internal (memory only):     ['data', 'investigate_data', 'iris']
 ```
 
-**First run — parallel stage dispatch:**
+**First run — persistent docker dispatch:**
 ```
-[PipelineComposer] dispatching 1 stage(s) in parallel: ['preprocessing']
-[PipelineComposer] stage 'preprocessing' finished, checking downstream stages
-[PipelineComposer] stage 'splitting' unblocked — dispatching
-```
-
-**First run — Docker container lifecycle:**
-```
-[DockerExecutor] starting container for node: model
-[DockerExecutor] container healthy, sending work
-[DockerExecutor] node model complete, output type: LinearRegression
-[DockerExecutor] container stopped and removed
+[PersistentDockerExecutor] dispatching 'model' -> http://localhost:8003
+[PersistentDockerExecutor] 'model' complete, output type: LogisticRegression
 ```
 
 **Second run — entire stage skipped:**

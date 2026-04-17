@@ -130,7 +130,8 @@ flowchart TD
         C[PipelineComposer] --> D{per-node\nexecutor config}
         D --> E[InMemoryExecutor]
         D --> F[DockerExecutor]
-        D --> G[LambdaExecutor]
+        D --> G[PersistentDockerExecutor]
+        D --> H[LambdaExecutor]
     end
 ```
 
@@ -140,12 +141,12 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-    participant run_isolated.py
+    participant run_pipeline.py
     participant PipelineComposer
     participant ArtifactStore
     participant Executor
 
-    run_isolated.py->>PipelineComposer: run()
+    run_pipeline.py->>PipelineComposer: run()
     PipelineComposer->>PipelineComposer: dag(), functions(), parameters()
     Note over PipelineComposer: topo order: iris -> data -> ... -> model -> predictions
 
@@ -162,7 +163,7 @@ sequenceDiagram
         PipelineComposer->>ArtifactStore: put(node_name, result)
     end
 
-    PipelineComposer-->>run_isolated.py: results
+    PipelineComposer-->>run_pipeline.py: results
 ```
 
 ---
@@ -182,19 +183,27 @@ block-beta
 
 ## Folder layout
 
-```mermaid
-flowchart TD
-    A[pipeline/] --> B[pipeline_config.yaml\nexecutor and store config]
-    A --> C[composer.py\nPipelineComposer]
-    A --> D[executor/\nsee 02_executor.md]
-    A --> E[artifact_store/\nsee 03_artifact_store.md]
-    A --> F[config.py\nreads YAML\nreturns right executor per node]
 ```
+solution/                         <- orchestration layer
+├── run_pipeline.py
+├── composer.py
+├── config.py
+├── executor/
+└── artifact_store/
+
+deploy/                           <- infrastructure (separate from orchestration)
+├── worker/                       <- FastAPI worker server + Dockerfiles
+├── docker-compose.yml
+├── docker-compose-multi.yml
+└── lambda.py
+```
+
+The `deploy/` directory is intentionally separate. It contains the Docker worker image, compose files, and Lambda packaging — none of which are part of the fn_graph orchestration logic. The executor plugins (`docker.py`, `persistent_docker.py`, `lambda_executor.py`) live in `solution/executor/` because they are client-side abstractions, not infrastructure.
 
 ---
 
 ## Key Notes
 
 - We call three methods on fn_graph: `dag()`, `functions()`, `parameters()`. That is the entire dependency surface. fn_graph version changes are unlikely to break anything on our side.
-- `PipelineComposer` replaces `Composer()` in `run_isolated.py`. Nothing else in that file changes.
+- `PipelineComposer` replaces `Composer()` in `run_pipeline.py`. Nothing else in that file changes.
 - Executor and ArtifactStore are each covered in their own docs. This file is only about the composer layer.
